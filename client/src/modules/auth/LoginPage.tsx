@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "../../api/auth";
 import { useAuthStore } from "../../lib/auth-store";
 import { Button } from "../../components/ui/Button";
@@ -13,6 +13,8 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const setSession = useAuthStore((s) => s.setSession);
   const navigate = useNavigate();
+  const location = useLocation();
+  const passwordChanged = (location.state as { passwordChanged?: boolean } | null)?.passwordChanged;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -34,6 +36,12 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <h1 className="mb-1 text-2xl font-bold text-brand-600">Finanças</h1>
         <p className="mb-6 text-sm text-slate-500">Entre na sua conta</p>
+
+        {passwordChanged && (
+          <p className="mb-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-400">
+            Senha alterada! Entre com sua nova senha.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

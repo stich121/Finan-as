@@ -2,6 +2,8 @@ node_modules/
 dist/
 build/
 deploy/
+deploy-update/
+deploy-update.zip
 .claude/
 .env
 .env.local

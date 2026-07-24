@@ -13,6 +13,12 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Informe a senha atual"),
+  newPassword: z.string().min(8, "A nova senha precisa ter pelo menos 8 caracteres").max(200),
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 export const authUserSchema = z.object({
   id: z.string(),
   name: z.string(),

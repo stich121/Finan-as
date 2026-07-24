@@ -95,6 +95,18 @@ export async function revoke(rawToken: string) {
   });
 }
 
+export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) throw unauthorized("Senha atual incorreta");
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    prisma.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+  ]);
+}
+
 export async function getProfile(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   return toAuthUser(user);

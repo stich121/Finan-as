@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import type { ThemePreference } from "../../lib/theme";
 import { applyTheme, getStoredTheme } from "../../lib/theme";
 import { Card } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { Input, Label } from "../../components/ui/Input";
 import { useAuthStore } from "../../lib/auth-store";
+import { authApi } from "../../api/auth";
 
 const OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: "light", label: "Claro" },
@@ -13,10 +17,39 @@ const OPTIONS: { value: ThemePreference; label: string }[] = [
 export function SettingsPage() {
   const [theme, setTheme] = useState<ThemePreference>(getStoredTheme());
   const user = useAuthStore((s) => s.user);
+  const clear = useAuthStore((s) => s.clear);
+  const navigate = useNavigate();
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   function handleChange(value: ThemePreference) {
     setTheme(value);
     applyTheme(value);
+  }
+
+  async function handlePasswordSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (newPassword !== confirmPassword) {
+      setError("A confirmação não bate com a nova senha");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await authApi.changePassword({ currentPassword, newPassword });
+      clear();
+      navigate("/login", { state: { passwordChanged: true } });
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? "Não foi possível trocar a senha");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -30,7 +63,7 @@ export function SettingsPage() {
         <p className="mt-1 text-sm text-slate-500">Moeda: {user?.currency}</p>
       </Card>
 
-      <Card>
+      <Card className="mb-4">
         <h2 className="mb-3 font-semibold">Tema</h2>
         <div className="grid grid-cols-3 gap-2">
           {OPTIONS.map((opt) => (
@@ -47,6 +80,48 @@ export function SettingsPage() {
             </button>
           ))}
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-3 font-semibold">Trocar senha</h2>
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <div>
+            <Label>Senha atual</Label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label>Nova senha</Label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+          </div>
+          <div>
+            <Label>Confirmar nova senha</Label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={8}
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={loading}>
+            {loading ? "Salvando..." : "Trocar senha"}
+          </Button>
+          <p className="text-xs text-slate-500">
+            Depois de trocar, você vai precisar entrar novamente com a nova senha.
+          </p>
+        </form>
       </Card>
     </div>
   );

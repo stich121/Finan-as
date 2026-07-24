@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { loginSchema, registerSchema } from "@financas/shared";
+import { changePasswordSchema, loginSchema, registerSchema } from "@financas/shared";
 import { validateBody } from "../../middleware/validate.js";
 import { asyncHandler } from "../../middleware/async-handler.js";
 import { requireAuth } from "../../middleware/require-auth.js";
@@ -65,5 +65,16 @@ authRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     res.json(await service.getProfile(req.userId!));
+  }),
+);
+
+authRouter.post(
+  "/change-password",
+  requireAuth,
+  validateBody(changePasswordSchema),
+  asyncHandler(async (req, res) => {
+    await service.changePassword(req.userId!, req.body.currentPassword, req.body.newPassword);
+    res.clearCookie(REFRESH_COOKIE, { path: "/api/auth" });
+    res.status(204).end();
   }),
 );

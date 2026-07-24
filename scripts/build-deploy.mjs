@@ -68,8 +68,9 @@ writeFileSync(path.join(deployDir, "package.json"), JSON.stringify(deployPkg, nu
 const envExample = `# Copie estas variáveis para a seção "Environment variables" do app Node.js no hPanel
 # (não suba um .env real por FTP dentro desta pasta).
 
-# Igual ao MySQL usado em desenvolvimento, mas com host "localhost" (app e banco no mesmo servidor)
-DATABASE_URL="mysql://u654041352_MathFinancas:SENHA_AQUI@localhost:3306/u654041352_Financas"
+# O banco MySQL da Hostinger fica num servidor separado do app Node (mesmo estando na mesma
+# conta) — "localhost" NÃO funciona aqui, precisa do host remoto mesmo em produção.
+DATABASE_URL="mysql://u654041352_MathFinancas:SENHA_AQUI@srv1894.hstgr.io:3306/u654041352_Financas"
 
 # Gere segredos novos (nao reaproveitar os de desenvolvimento), ex: openssl rand -hex 32
 JWT_ACCESS_SECRET="GERAR_SEGREDO_NOVO_AQUI"

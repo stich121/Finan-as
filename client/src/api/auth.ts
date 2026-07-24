@@ -1,4 +1,4 @@
-import type { AuthUser, LoginInput, RegisterInput } from "@financas/shared";
+import type { AuthUser, ChangePasswordInput, LoginInput, RegisterInput } from "@financas/shared";
 import { api } from "../lib/api";
 
 interface AuthResponse {
@@ -11,4 +11,5 @@ export const authApi = {
   login: (input: LoginInput) => api.post<AuthResponse>("/auth/login", input).then((r) => r.data),
   logout: () => api.post("/auth/logout"),
   me: () => api.get<AuthUser>("/auth/me").then((r) => r.data),
+  changePassword: (input: ChangePasswordInput) => api.post("/auth/change-password", input),
 };

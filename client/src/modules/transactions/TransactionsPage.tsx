@@ -8,6 +8,7 @@ import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input, Label, Select } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { formatDate, formatMoney } from "../../lib/format";
 import { NewTransactionForm } from "./NewTransactionForm";
 
@@ -20,6 +21,7 @@ export function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const filters = useMemo(
     () => ({
@@ -51,7 +53,11 @@ export function TransactionsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => transactionsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      setDeleteTarget(null);
+    },
   });
 
   const bulkMutation = useMutation({
@@ -173,7 +179,7 @@ export function TransactionsPage() {
                   </td>
                   <td className="py-2 text-right">
                     <button
-                      onClick={() => deleteMutation.mutate(tx.id)}
+                      onClick={() => setDeleteTarget(tx.id)}
                       className="text-xs text-slate-400 hover:text-red-600"
                     >
                       Excluir
@@ -213,6 +219,15 @@ export function TransactionsPage() {
           }}
         />
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Excluir transação"
+        message="Tem certeza que deseja excluir essa transação? Essa ação não pode ser desfeita e o saldo da conta será ajustado."
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

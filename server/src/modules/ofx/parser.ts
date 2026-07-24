@@ -38,15 +38,23 @@ function decodeOfxBuffer(buffer: Buffer): string {
   return buffer.toString(usesLatin1 ? "latin1" : "utf-8");
 }
 
-/** Converte o corpo SGML do OFX 1.x (tags de dado sem fechamento) para XML bem formado. */
+/**
+ * Fecha tags de dado do OFX 1.x (SGML) que não têm fechamento. Alguns bancos (ex: Inter) declaram
+ * o cabeçalho OFXSGML mas já emitem tags fechadas — o regex é idempotente para não duplicar o
+ * fechamento nesses casos (captura opcionalmente o `</TAG>` já existente e, se achar, não mexe).
+ */
 function sgmlToXml(body: string): string {
-  return body.replace(/<([A-Za-z0-9._]+)>([^<\r\n]*)/g, (_match, tag: string, value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length > 0) {
-      return `<${tag}>${escapeXml(trimmed)}</${tag}>`;
-    }
-    return `<${tag}>`;
-  });
+  return body.replace(
+    /<([A-Za-z0-9._]+)>([^<\r\n]*)(<\/\1>)?/g,
+    (match, tag: string, value: string, existingClose: string | undefined) => {
+      if (existingClose) return match;
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return `<${tag}>${escapeXml(trimmed)}</${tag}>`;
+      }
+      return `<${tag}>`;
+    },
+  );
 }
 
 function parseOfxDate(raw?: string | number): Date | null {
@@ -114,10 +122,8 @@ export function parseOfx(buffer: Buffer): RawOfxStatement[] {
     throw new Error("Arquivo OFX inválido: tag <OFX> não encontrada");
   }
 
-  const header = withoutPIs.slice(0, ofxTagIndex);
   const body = withoutPIs.slice(ofxTagIndex);
-  const isSgml = !/^\s*<\?xml/i.test(raw) && !/DATA:\s*OFXXML/i.test(header);
-  const xml = isSgml ? sgmlToXml(body) : body;
+  const xml = sgmlToXml(body);
 
   const parser = new XMLParser({ ignoreAttributes: true, trimValues: true });
   const parsed = parser.parse(xml) as Record<string, any>;
