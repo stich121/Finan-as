@@ -1,4 +1,4 @@
-public/api/config.php
+api/config.php
 .claude/
 *.log
 .DS_Store
