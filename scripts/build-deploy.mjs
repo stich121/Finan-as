@@ -27,21 +27,32 @@ function run(command, cwd) {
   execSync(command, { stdio: "inherit", cwd: cwd ?? rootDir });
 }
 
-console.log("== 1/5 Limpando pasta deploy/ ==");
+// Rodamos como "postinstall" do pacote raiz — inclusive em produção (Hostinger costuma
+// setar NODE_ENV=production também na fase de instalação, o que faz o npm pular
+// devDependencies). Sem vite/esbuild/prisma CLI instalados o build abaixo quebraria,
+// então garantimos aqui que as devDependencies de todos os workspaces existem antes de
+// buildar. --ignore-scripts evita reentrar neste mesmo postinstall (recursão infinita).
+console.log("== 0/6 Garantindo devDependencies (vite, esbuild, prisma) ==");
+run("npm install --include=dev --ignore-scripts --no-audit --no-fund");
+
+console.log("== 1/6 Limpando pasta deploy/ ==");
 rmSync(deployDir, { recursive: true, force: true });
 mkdirSync(deployDir, { recursive: true });
 
-console.log("== 2/5 Build do client (Vite) ==");
+console.log("== 2/6 Gerando Prisma Client ==");
+run("npm run prisma:generate --workspace=server");
+
+console.log("== 3/6 Build do client (Vite) ==");
 run("npm run build --workspace=client");
 
-console.log("== 3/5 Bundle do servidor (esbuild) ==");
+console.log("== 4/6 Bundle do servidor (esbuild) ==");
 run("npm run build:bundle --workspace=server");
 
-console.log("== 4/5 Copiando client/dist -> deploy/public e prisma/ ==");
+console.log("== 5/6 Copiando client/dist -> deploy/public e prisma/ ==");
 cpSync(path.join(rootDir, "client", "dist"), path.join(deployDir, "public"), { recursive: true });
 cpSync(path.join(rootDir, "server", "prisma"), path.join(deployDir, "prisma"), { recursive: true });
 
-console.log("== 5/5 Gerando package.json e .env.example do deploy ==");
+console.log("== 6/6 Gerando package.json e .env.example do deploy ==");
 const deployDependencies = {};
 for (const dep of EXTERNAL_DEPS) {
   if (!serverPkg.dependencies[dep]) {
