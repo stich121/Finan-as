@@ -24,11 +24,25 @@ export function createApp() {
   app.use(express.json({ limit: "10mb" }));
   app.use("/api", apiRouter);
 
+  // TEMP: rota de diagnóstico de deploy — remover depois de descobrir o problema do 500.
+  app.get("/__debug", (_req, res) => {
+    res.json({
+      cwd: process.cwd(),
+      currentDir,
+      publicDir,
+      publicDirExists: fs.existsSync(publicDir),
+      publicDirContents: fs.existsSync(publicDir) ? fs.readdirSync(publicDir) : null,
+      indexHtmlExists: fs.existsSync(path.join(publicDir, "index.html")),
+    });
+  });
+
   // Em produção o bundle vem acompanhado de uma pasta "public" (build do client) — ausente em dev.
   if (fs.existsSync(publicDir)) {
     app.use(express.static(publicDir));
-    app.get(/^(?!\/api).*/, (_req, res) => {
-      res.sendFile(path.join(publicDir, "index.html"));
+    app.get(/^(?!\/api).*/, (_req, res, next) => {
+      res.sendFile(path.join(publicDir, "index.html"), (err) => {
+        if (err) next(err);
+      });
     });
   }
 
