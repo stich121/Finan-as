@@ -12,7 +12,7 @@ function app_config(): array
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
-            'error' => 'Configuração ausente. Copie public/api/config.example.php para public/api/config.php e preencha os dados do banco.',
+            'error' => 'Configuração ausente. Copie api/config.example.php para api/config.php e preencha os dados do banco.',
         ]);
         exit;
     }
