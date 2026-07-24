@@ -2,7 +2,8 @@ import { api } from '../api.js';
 import { toastError, toastSuccess } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { getState, setState } from '../state.js';
-import { formatCurrency, formatMonthLabel, addMonths, el } from '../utils.js';
+import { formatCurrency, formatMonthLabel, addMonths, el, categoryOptionsHtml } from '../utils.js';
+import { icon } from '../icons.js';
 
 let container;
 let categories = [];
@@ -61,7 +62,7 @@ async function load() {
         <div style="padding:12px 0;border-bottom:1px solid var(--border);">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div class="title" style="font-weight:600;font-size:14px;"><span class="dot" style="background:${b.categoryColor || '#64748b'}"></span> ${escapeHtml(b.categoryName)}</div>
-            <button class="btn ghost" data-id="${b.id}">✏️</button>
+            <button class="btn ghost" data-id="${b.id}">${icon('edit', { size: 16 })}</button>
           </div>
           <div class="subtitle" style="margin-top:4px;">${formatCurrency(b.spent)} de ${formatCurrency(b.amount)}${over ? ' · estourado' : ''}</div>
           <div class="progress-bar ${over ? 'over' : ''}"><div style="width:${pct}%"></div></div>
@@ -82,7 +83,7 @@ function openBudgetForm(month, budgets, budget = null) {
       <div class="field">
         <label for="budget-category">Categoria</label>
         <select id="budget-category" name="categoryId" ${budget ? 'disabled' : ''}>
-          ${available.map((c) => `<option value="${c.id}" ${budget?.categoryId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          ${categoryOptionsHtml(available, budget?.categoryId)}
         </select>
       </div>
       <div class="field">

@@ -2,8 +2,9 @@ import { api } from '../api.js';
 import { toastError, toastSuccess } from '../components/toast.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
 import { openModal } from '../components/modal.js';
-import { formatCurrency, formatDate, debounce, el } from '../utils.js';
+import { formatCurrency, formatDate, debounce, el, categoryOptionsHtml } from '../utils.js';
 import { openTransactionForm } from './transaction-form.js';
+import { icon } from '../icons.js';
 
 let container;
 let accounts = [];
@@ -25,7 +26,7 @@ export async function render(root) {
   buildFilters();
   container.appendChild(el('<div id="tx-list"></div>'));
 
-  fab = el('<button class="fab" aria-label="Nova transação">+</button>');
+  fab = el(`<button class="fab" aria-label="Nova transação">${icon('plus', { size: 26 })}</button>`);
   document.body.appendChild(fab);
   fab.addEventListener('click', () => openTransactionForm({ onSaved: () => loadList() }));
 
@@ -52,7 +53,7 @@ function buildFilters() {
   const wrap = el(`
     <div class="filters">
       <select id="f-account"><option value="">Todas as contas</option>${accounts.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select>
-      <select id="f-category"><option value="">Todas as categorias</option>${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
+      <select id="f-category"><option value="">Todas as categorias</option>${categoryOptionsHtml(categories)}</select>
       <select id="f-type">
         <option value="">Todos os tipos</option>
         <option value="INCOME">Receita</option>
@@ -106,7 +107,7 @@ async function loadList() {
       <div class="btn-row">
         <select id="bulk-category" style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px;">
           <option value="">Categorizar em massa…</option>
-          ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+          ${categoryOptionsHtml(categories)}
         </select>
         <button class="btn small" id="bulk-apply-btn">Aplicar</button>
       </div>
@@ -126,6 +127,7 @@ async function loadList() {
         <div class="meta" style="flex:1;cursor:pointer;">
           <div class="title">${escapeHtml(tx.description || tx.payee || 'Sem descrição')}</div>
           <div class="subtitle">${formatDate(tx.date)} · ${account ? escapeHtml(account.name) : ''}${category ? ' · ' + escapeHtml(category.name) : tx.type !== 'TRANSFER' ? ' · <span style="color:var(--warning)">sem categoria</span>' : ''}</div>
+          ${tx.tags && tx.tags.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${tx.tags.map((t) => `<span class="chip" style="border-color:${t.color || 'var(--border)'};"><span class="dot" style="background:${t.color || '#64748b'}"></span> ${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="amount ${tx.amount < 0 ? 'expense' : 'income'}">${formatCurrency(tx.amount)}</div>
       </div>
@@ -173,7 +175,7 @@ function openTransactionDetail(tx, account, category) {
         <label for="quick-category">Categorizar</label>
         <select id="quick-category">
           <option value="">Sem categoria</option>
-          ${categories.filter((c) => c.kind === tx.type).map((c) => `<option value="${c.id}" ${tx.categoryId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          ${categoryOptionsHtml(categories.filter((c) => c.kind === tx.type), tx.categoryId)}
         </select>
       </div>
       <label class="chip" style="margin-bottom:14px;display:inline-flex;"><input type="checkbox" id="learn-rule" style="margin-right:4px;" />Lembrar essa categorização</label>

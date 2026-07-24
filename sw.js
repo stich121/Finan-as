@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'financas-v2';
+const CACHE_VERSION = 'financas-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -12,6 +12,7 @@ const PRECACHE_URLS = [
   '/assets/js/state.js',
   '/assets/js/utils.js',
   '/assets/js/charts.js',
+  '/assets/js/icons.js',
   '/assets/js/components/modal.js',
   '/assets/js/components/confirm-dialog.js',
   '/assets/js/components/toast.js',
@@ -20,6 +21,8 @@ const PRECACHE_URLS = [
   '/assets/js/pages/dashboard.js',
   '/assets/js/pages/accounts.js',
   '/assets/js/pages/categories.js',
+  '/assets/js/pages/tags.js',
+  '/assets/js/pages/goals.js',
   '/assets/js/pages/transactions.js',
   '/assets/js/pages/transaction-form.js',
   '/assets/js/pages/ofx-import.js',

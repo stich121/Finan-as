@@ -11,6 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../api/lib/config.php';
 require_once __DIR__ . '/../api/lib/db.php';
 require_once __DIR__ . '/../api/lib/auth.php';
+require_once __DIR__ . '/icons.php';
 
 start_app_session();
 
@@ -41,11 +42,11 @@ function h($value): string
 }
 
 $navItems = [
-    ['key' => 'dashboard', 'href' => '/index.php', 'icon' => '🏠', 'label' => 'Início'],
-    ['key' => 'transactions', 'href' => '/transactions.php', 'icon' => '💳', 'label' => 'Transações'],
-    ['key' => 'accounts', 'href' => '/accounts.php', 'icon' => '🏦', 'label' => 'Contas'],
-    ['key' => 'budgets', 'href' => '/budgets.php', 'icon' => '🎯', 'label' => 'Orçamento'],
-    ['key' => 'settings', 'href' => '/settings.php', 'icon' => '⚙️', 'label' => 'Ajustes'],
+    ['key' => 'dashboard', 'href' => '/index.php', 'icon' => 'home', 'label' => 'Início'],
+    ['key' => 'transactions', 'href' => '/transactions.php', 'icon' => 'card', 'label' => 'Transações'],
+    ['key' => 'accounts', 'href' => '/accounts.php', 'icon' => 'bank', 'label' => 'Contas'],
+    ['key' => 'budgets', 'href' => '/budgets.php', 'icon' => 'target', 'label' => 'Orçamento'],
+    ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Ajustes'],
 ];
 ?>
 <!doctype html>
@@ -84,7 +85,7 @@ $navItems = [
     <nav class="bottom-nav">
       <?php foreach ($navItems as $item): ?>
       <a href="<?= h($item['href']) ?>" class="<?= ($activeNav ?? '') === $item['key'] ? 'active' : '' ?>">
-        <span class="nav-icon"><?= $item['icon'] ?></span><span><?= h($item['label']) ?></span>
+        <span class="nav-icon"><?= icon_svg($item['icon'], 22) ?></span><span><?= h($item['label']) ?></span>
       </a>
       <?php endforeach; ?>
     </nav>

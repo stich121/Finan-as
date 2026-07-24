@@ -158,4 +158,19 @@ CREATE TABLE IF NOT EXISTS ofx_staging (
   CONSTRAINT fk_ofx_staging_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS goals (
+  id             CHAR(36)      NOT NULL PRIMARY KEY,
+  user_id        CHAR(36)      NOT NULL,
+  name           VARCHAR(120)  NOT NULL,
+  target_amount  DECIMAL(14,2) NOT NULL,
+  current_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  target_date    DATE          NULL,
+  color          VARCHAR(20)   NULL,
+  achieved_at    DATETIME      NULL,
+  created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_goals_user (user_id),
+  CONSTRAINT fk_goals_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;

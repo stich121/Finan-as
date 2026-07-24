@@ -2,7 +2,8 @@ import { api } from '../api.js';
 import { toastError, toastSuccess } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
-import { formatCurrency, formatDate, el } from '../utils.js';
+import { formatCurrency, formatDate, el, categoryOptionsHtml } from '../utils.js';
+import { icon } from '../icons.js';
 
 let container;
 let accounts = [];
@@ -57,8 +58,8 @@ async function load() {
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             <div class="amount ${r.type === 'EXPENSE' ? 'expense' : 'income'}">${formatCurrency(r.type === 'EXPENSE' ? -r.amount : r.amount)}</div>
-            <button class="btn ghost" data-action="post" data-id="${r.id}" title="Lançar agora">▶️</button>
-            <button class="btn ghost" data-action="edit" data-id="${r.id}">✏️</button>
+            <button class="btn ghost" data-action="post" data-id="${r.id}" title="Lançar agora">${icon('play', { size: 16 })}</button>
+            <button class="btn ghost" data-action="edit" data-id="${r.id}">${icon('edit', { size: 16 })}</button>
           </div>
         </div>
       `);
@@ -114,7 +115,7 @@ function openForm(recurring) {
           <label for="rec-category">Categoria</label>
           <select id="rec-category" name="categoryId">
             <option value="">Sem categoria</option>
-            ${categories.filter((c) => c.kind === type).map((c) => `<option value="${c.id}" ${recurring?.categoryId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+            ${categoryOptionsHtml(categories.filter((c) => c.kind === type), recurring?.categoryId)}
           </select>
         </div>
         <div class="field-row">

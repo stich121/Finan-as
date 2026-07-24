@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { getState } from '../state.js';
 import { toastSuccess } from '../components/toast.js';
 import { el } from '../utils.js';
+import { icon } from '../icons.js';
 
 let container;
 
@@ -23,9 +24,11 @@ export async function render(root) {
 
   const linksCard = el(`
     <div class="card">
-      <a href="/categories.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Categorias</div></div><span>›</span></a>
-      <a href="/rules.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Regras de categorização</div></div><span>›</span></a>
-      <a href="/recurring.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Recorrências</div></div><span>›</span></a>
+      <a href="/categories.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Categorias</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/tags.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Tags</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/rules.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Regras de categorização</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/recurring.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Recorrências</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/goals.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Metas financeiras</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
     </div>
   `);
   container.appendChild(linksCard);

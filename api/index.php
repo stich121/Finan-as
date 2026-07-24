@@ -44,6 +44,7 @@ $routes = [
     'recurring' => 'recurring.php',
     'dashboard' => 'dashboard.php',
     'ofx' => 'ofx.php',
+    'goals' => 'goals.php',
 ];
 
 if ($resource === '' || !isset($routes[$resource])) {

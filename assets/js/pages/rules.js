@@ -2,7 +2,8 @@ import { api } from '../api.js';
 import { toastError, toastSuccess } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
-import { el } from '../utils.js';
+import { el, categoryOptionsHtml } from '../utils.js';
+import { icon } from '../icons.js';
 
 let container;
 let categories = [];
@@ -56,7 +57,7 @@ async function load() {
             <div class="title">${FIELD_LABELS[rule.matchField]} ${TYPE_LABELS[rule.matchType]} "${escapeHtml(rule.pattern)}"</div>
             <div class="subtitle">→ ${category ? escapeHtml(category.name) : '?'} · prioridade ${rule.priority}${rule.enabled ? '' : ' · desabilitada'}</div>
           </div>
-          <button class="btn ghost" data-id="${rule.id}">✏️</button>
+          <button class="btn ghost" data-id="${rule.id}">${icon('edit', { size: 16 })}</button>
         </div>
       `);
       row.querySelector('button').addEventListener('click', () => openRuleForm(rule));
@@ -74,7 +75,7 @@ function openRuleForm(rule) {
       <div class="field">
         <label for="rule-category">Categoria</label>
         <select id="rule-category" name="categoryId">
-          ${categories.map((c) => `<option value="${c.id}" ${rule?.categoryId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+          ${categoryOptionsHtml(categories, rule?.categoryId)}
         </select>
       </div>
       <div class="field-row">

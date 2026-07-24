@@ -162,57 +162,74 @@ function auth_change_password(): void
     json_response(['ok' => true]);
 }
 
+/**
+ * Estrutura padrão de categorias e subcategorias criada para todo usuário novo
+ * (mesmo formato usado pela tela de Categorias: pai -> filhas via parent_id).
+ */
+function default_category_tree(): array
+{
+    return [
+        'EXPENSE' => [
+            'Alimentação' => ['#f97316', ['Supermercado', 'Restaurante', 'Delivery', 'Padaria e café']],
+            'Transporte' => ['#0ea5e9', ['Combustível', 'Uber e táxi', 'Transporte público', 'Estacionamento', 'Manutenção do veículo']],
+            'Moradia' => ['#8b5cf6', ['Aluguel', 'Condomínio', 'Energia elétrica', 'Água', 'Internet', 'Gás']],
+            'Saúde' => ['#22c55e', ['Farmácia', 'Plano de saúde', 'Consultas e exames', 'Academia']],
+            'Educação' => ['#eab308', ['Mensalidade', 'Cursos', 'Livros e material']],
+            'Lazer' => ['#ec4899', ['Streaming', 'Viagens', 'Cinema e shows', 'Hobbies']],
+            'Compras' => ['#f43f5e', ['Roupas e calçados', 'Eletrônicos', 'Casa e decoração']],
+            'Pets' => ['#14b8a6', ['Veterinário', 'Ração e petshop']],
+            'Impostos e taxas' => ['#a855f7', ['IPVA e IPTU', 'Taxas bancárias']],
+            'Outros' => ['#64748b', []],
+        ],
+        'INCOME' => [
+            'Salário' => ['#16a34a', ['Salário fixo', 'Bônus e 13º']],
+            'Freelance' => ['#0891b2', []],
+            'Investimentos' => ['#7c3aed', ['Dividendos', 'Rendimentos']],
+            'Outras receitas' => ['#64748b', ['Reembolsos', 'Presentes e doações']],
+        ],
+    ];
+}
+
 function seed_default_categories_and_rules(PDO $pdo, string $userId): void
 {
-    $expenseCategories = [
-        'Alimentação' => ['color' => '#f97316', 'icon' => 'utensils'],
-        'Transporte' => ['color' => '#0ea5e9', 'icon' => 'car'],
-        'Moradia' => ['color' => '#8b5cf6', 'icon' => 'home'],
-        'Lazer' => ['color' => '#ec4899', 'icon' => 'sparkles'],
-        'Saúde' => ['color' => '#22c55e', 'icon' => 'heart-pulse'],
-        'Educação' => ['color' => '#eab308', 'icon' => 'book'],
-        'Compras' => ['color' => '#f43f5e', 'icon' => 'shopping-bag'],
-        'Assinaturas' => ['color' => '#6366f1', 'icon' => 'repeat'],
-        'Outros' => ['color' => '#64748b', 'icon' => 'more-horizontal'],
-    ];
-    $incomeCategories = [
-        'Salário' => ['color' => '#16a34a', 'icon' => 'wallet'],
-        'Freelance' => ['color' => '#0891b2', 'icon' => 'briefcase'],
-        'Investimentos' => ['color' => '#7c3aed', 'icon' => 'trending-up'],
-        'Outras receitas' => ['color' => '#64748b', 'icon' => 'more-horizontal'],
-    ];
-
-    $categoryIds = [];
     $insertCategory = $pdo->prepare(
         'INSERT INTO categories (id, user_id, name, kind, parent_id, color, icon, created_at, updated_at)
-         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)'
     );
 
-    foreach ($expenseCategories as $name => $meta) {
-        $id = uuid_v4();
-        $categoryIds[$name] = $id;
-        $insertCategory->execute([$id, $userId, $name, 'EXPENSE', $meta['color'], $meta['icon'], now_datetime(), now_datetime()]);
-    }
-    foreach ($incomeCategories as $name => $meta) {
-        $id = uuid_v4();
-        $categoryIds[$name] = $id;
-        $insertCategory->execute([$id, $userId, $name, 'INCOME', $meta['color'], $meta['icon'], now_datetime(), now_datetime()]);
+    // categoryIds mapeia "Nome" (raiz) e "Pai > Filha" (subcategoria) para facilitar as regras abaixo.
+    $categoryIds = [];
+    foreach (default_category_tree() as $kind => $categories) {
+        foreach ($categories as $name => [$color, $children]) {
+            $parentId = uuid_v4();
+            $categoryIds[$name] = $parentId;
+            $insertCategory->execute([$parentId, $userId, $name, $kind, null, $color, now_datetime(), now_datetime()]);
+
+            foreach ($children as $childName) {
+                $childId = uuid_v4();
+                $categoryIds["$name > $childName"] = $childId;
+                $insertCategory->execute([$childId, $userId, $childName, $kind, $parentId, $color, now_datetime(), now_datetime()]);
+            }
+        }
     }
 
     // Regras padrão de categorização automática (palavras comuns em descrição/beneficiário de extratos BR).
     $defaultRules = [
-        ['category' => 'Alimentação', 'pattern' => 'IFOOD', 'priority' => 100],
-        ['category' => 'Alimentação', 'pattern' => 'RESTAURANTE', 'priority' => 90],
-        ['category' => 'Alimentação', 'pattern' => 'MERCADO', 'priority' => 90],
-        ['category' => 'Alimentação', 'pattern' => 'SUPERMERCADO', 'priority' => 90],
-        ['category' => 'Transporte', 'pattern' => 'UBER', 'priority' => 100],
-        ['category' => 'Transporte', 'pattern' => '99APP', 'priority' => 100],
-        ['category' => 'Transporte', 'pattern' => 'POSTO', 'priority' => 90],
-        ['category' => 'Assinaturas', 'pattern' => 'NETFLIX', 'priority' => 100],
-        ['category' => 'Assinaturas', 'pattern' => 'SPOTIFY', 'priority' => 100],
-        ['category' => 'Saúde', 'pattern' => 'FARMACIA', 'priority' => 90],
-        ['category' => 'Salário', 'pattern' => 'SALARIO', 'priority' => 100],
-        ['category' => 'Salário', 'pattern' => 'PAGAMENTO SALARIO', 'priority' => 100],
+        ['category' => 'Alimentação > Delivery', 'pattern' => 'IFOOD', 'priority' => 100],
+        ['category' => 'Alimentação > Restaurante', 'pattern' => 'RESTAURANTE', 'priority' => 90],
+        ['category' => 'Alimentação > Supermercado', 'pattern' => 'MERCADO', 'priority' => 90],
+        ['category' => 'Alimentação > Supermercado', 'pattern' => 'SUPERMERCADO', 'priority' => 90],
+        ['category' => 'Transporte > Uber e táxi', 'pattern' => 'UBER', 'priority' => 100],
+        ['category' => 'Transporte > Uber e táxi', 'pattern' => '99APP', 'priority' => 100],
+        ['category' => 'Transporte > Combustível', 'pattern' => 'POSTO', 'priority' => 90],
+        ['category' => 'Lazer > Streaming', 'pattern' => 'NETFLIX', 'priority' => 100],
+        ['category' => 'Lazer > Streaming', 'pattern' => 'SPOTIFY', 'priority' => 100],
+        ['category' => 'Saúde > Farmácia', 'pattern' => 'FARMACIA', 'priority' => 90],
+        ['category' => 'Saúde > Academia', 'pattern' => 'ACADEMIA', 'priority' => 90],
+        ['category' => 'Moradia > Energia elétrica', 'pattern' => 'ENERGIA', 'priority' => 90],
+        ['category' => 'Moradia > Internet', 'pattern' => 'INTERNET', 'priority' => 90],
+        ['category' => 'Salário > Salário fixo', 'pattern' => 'SALARIO', 'priority' => 100],
+        ['category' => 'Salário > Salário fixo', 'pattern' => 'PAGAMENTO SALARIO', 'priority' => 100],
     ];
 
     $insertRule = $pdo->prepare(

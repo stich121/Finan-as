@@ -1,3 +1,5 @@
+import { icon } from '../icons.js';
+
 export function openModal({ title, contentEl, onClose } = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -12,7 +14,7 @@ export function openModal({ title, contentEl, onClose } = {}) {
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.setAttribute('aria-label', 'Fechar');
-  closeBtn.textContent = '×';
+  closeBtn.innerHTML = icon('close', { size: 18 });
   header.append(h2, closeBtn);
 
   sheet.appendChild(header);

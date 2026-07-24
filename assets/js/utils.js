@@ -34,6 +34,30 @@ export function el(html) {
   return template.content.firstElementChild;
 }
 
+function escapeHtmlUtil(str) {
+  const d = document.createElement('div');
+  d.textContent = str ?? '';
+  return d.innerHTML;
+}
+
+/**
+ * Monta <option>/<optgroup> de categorias agrupando subcategorias sob a categoria pai.
+ * @param {Array} categories lista de categorias (já filtrada por kind, se necessário)
+ * @param {string|null} selectedId id pré-selecionado
+ */
+export function categoryOptionsHtml(categories, selectedId = null) {
+  const ids = new Set(categories.map((c) => c.id));
+  const roots = categories.filter((c) => !c.parentId || !ids.has(c.parentId));
+  const opt = (c) => `<option value="${c.id}" ${selectedId === c.id ? 'selected' : ''}>${escapeHtmlUtil(c.name)}</option>`;
+  return roots
+    .map((root) => {
+      const children = root.parentId ? [] : categories.filter((c) => c.parentId === root.id);
+      if (children.length === 0) return opt(root);
+      return `<optgroup label="${escapeHtmlUtil(root.name)}">${opt(root)}${children.map(opt).join('')}</optgroup>`;
+    })
+    .join('');
+}
+
 export function debounce(fn, wait = 300) {
   let t;
   return (...args) => {

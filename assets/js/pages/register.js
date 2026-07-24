@@ -1,4 +1,5 @@
 import { api, ApiError } from '../api.js';
+import { icon } from '../icons.js';
 
 export async function render(container) {
   const wrap = document.createElement('div');
@@ -6,7 +7,7 @@ export async function render(container) {
   wrap.innerHTML = `
     <div class="auth-card">
       <div class="auth-brand">
-        <div class="logo">💰</div>
+        <div class="logo">${icon('wallet', { size: 30 })}</div>
         <h1>Criar conta</h1>
         <p>Comece a organizar suas finanças</p>
       </div>

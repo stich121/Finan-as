@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { toastError, toastSuccess } from '../components/toast.js';
-import { formatCurrency, formatDate, el } from '../utils.js';
+import { formatCurrency, formatDate, el, categoryOptionsHtml } from '../utils.js';
 
 let container;
 let accounts = [];
@@ -83,10 +83,7 @@ function paintPreview() {
 
   preview.transactions.forEach((tx) => {
     const kind = tx.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-    const catOptions = categories
-      .filter((c) => c.kind === kind)
-      .map((c) => `<option value="${c.id}" ${tx.suggestedCategoryId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
-      .join('');
+    const catOptions = categoryOptionsHtml(categories.filter((c) => c.kind === kind), tx.suggestedCategoryId);
 
     const row = el(`
       <div class="list-item" style="align-items:flex-start;">

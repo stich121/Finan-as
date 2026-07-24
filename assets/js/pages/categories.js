@@ -3,6 +3,7 @@ import { toastError, toastSuccess } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
 import { el } from '../utils.js';
+import { icon } from '../icons.js';
 
 let container;
 let activeTab = 'EXPENSE';
@@ -64,24 +65,31 @@ function paint() {
     card.innerHTML = '<div class="empty-state">Nenhuma categoria aqui ainda.</div>';
   } else {
     roots.forEach((cat) => {
-      card.appendChild(categoryRow(cat, 0));
-      children(cat.id).forEach((child) => card.appendChild(categoryRow(child, 1)));
+      card.appendChild(categoryRow(cat, 0, true));
+      children(cat.id).forEach((child) => card.appendChild(categoryRow(child, 1, false)));
     });
   }
 
   header.querySelector('#new-cat-btn').addEventListener('click', () => openCategoryForm(null));
 }
 
-function categoryRow(cat, depth) {
+function categoryRow(cat, depth, isParent) {
   const row = el(`
-    <div class="list-item" style="padding-left:${depth * 18}px">
+    <div class="list-item" style="padding-left:${depth * 18 + 8}px">
       <div class="meta">
         <div class="title"><span class="dot" style="background:${cat.color || '#64748b'}"></span> ${escapeHtml(cat.name)}</div>
       </div>
-      <button class="btn ghost" data-id="${cat.id}">✏️</button>
+      <div style="display:flex;gap:4px;">
+        ${isParent ? `<button class="btn ghost" data-action="add-sub" title="Nova subcategoria">${icon('plus', { size: 16 })}</button>` : ''}
+        <button class="btn ghost" data-action="edit">${icon('edit', { size: 16 })}</button>
+      </div>
     </div>
   `);
-  row.querySelector('button').addEventListener('click', () => openCategoryForm(cat));
+  row.querySelector('[data-action="edit"]').addEventListener('click', () => openCategoryForm(cat));
+  const addSubBtn = row.querySelector('[data-action="add-sub"]');
+  if (addSubBtn) {
+    addSubBtn.addEventListener('click', () => openCategoryForm(null, cat));
+  }
   return row;
 }
 
@@ -91,11 +99,13 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-function openCategoryForm(category) {
+function openCategoryForm(category, presetParent = null) {
   const isEdit = !!category;
+  const kind = category?.kind || presetParent?.kind || activeTab;
+  const presetParentId = category?.parentId ?? presetParent?.id ?? '';
   const parentOptions = allCategories
-    .filter((c) => c.kind === (category?.kind || activeTab) && !c.parentId && c.id !== category?.id)
-    .map((c) => `<option value="${c.id}" ${category?.parentId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
+    .filter((c) => c.kind === kind && !c.parentId && c.id !== category?.id)
+    .map((c) => `<option value="${c.id}" ${presetParentId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
     .join('');
 
   const form = el(`
@@ -107,8 +117,8 @@ function openCategoryForm(category) {
       <div class="field">
         <label for="cat-kind">Tipo</label>
         <select id="cat-kind" name="kind">
-          <option value="EXPENSE" ${(category?.kind || activeTab) === 'EXPENSE' ? 'selected' : ''}>Despesa</option>
-          <option value="INCOME" ${(category?.kind || activeTab) === 'INCOME' ? 'selected' : ''}>Receita</option>
+          <option value="EXPENSE" ${kind === 'EXPENSE' ? 'selected' : ''}>Despesa</option>
+          <option value="INCOME" ${kind === 'INCOME' ? 'selected' : ''}>Receita</option>
         </select>
       </div>
       <div class="field">
@@ -130,7 +140,8 @@ function openCategoryForm(category) {
     </form>
   `);
 
-  const modal = openModal({ title: isEdit ? 'Editar categoria' : 'Nova categoria', contentEl: form });
+  const modalTitle = isEdit ? 'Editar categoria' : presetParent ? `Nova subcategoria de "${presetParent.name}"` : 'Nova categoria';
+  const modal = openModal({ title: modalTitle, contentEl: form });
   const errorEl = form.querySelector('#cat-form-error');
 
   form.addEventListener('submit', async (e) => {

@@ -3,6 +3,7 @@ import { toastError, toastSuccess } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
 import { formatCurrency, ACCOUNT_TYPE_LABELS, el } from '../utils.js';
+import { icon } from '../icons.js';
 
 let container;
 
@@ -41,12 +42,12 @@ async function load() {
       const item = el(`
         <div class="list-item">
           <div class="meta">
-            <div class="title">${acc.archived ? '🗄️ ' : ''}${escapeHtml(acc.name)}</div>
+            <div class="title">${acc.archived ? `<span class="inline-icon">${icon('archive', { size: 14 })}</span> ` : ''}${escapeHtml(acc.name)}</div>
             <div class="subtitle">${ACCOUNT_TYPE_LABELS[acc.type] || acc.type}${acc.institution ? ' · ' + escapeHtml(acc.institution) : ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="amount ${acc.balance < 0 ? 'expense' : 'income'}">${formatCurrency(acc.balance)}</div>
-            <button class="btn ghost" data-action="edit" data-id="${acc.id}">✏️</button>
+            <button class="btn ghost" data-action="edit" data-id="${acc.id}">${icon('edit', { size: 16 })}</button>
           </div>
         </div>
       `);
