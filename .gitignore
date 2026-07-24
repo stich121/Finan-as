@@ -1,15 +1,5 @@
-node_modules/
-dist/
-build/
-deploy/
-deploy-update/
-deploy-update.zip
+public/api/config.php
 .claude/
-.env
-.env.local
 *.log
 .DS_Store
 Thumbs.db
-.vite/
-coverage/
-*.tsbuildinfo

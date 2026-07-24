@@ -1,0 +1,13 @@
+RewriteEngine On
+
+DirectoryIndex index.php
+
+# Nunca serve o arquivo de configuração com credenciais do banco.
+<FilesMatch "^config\.php$">
+  Require all denied
+</FilesMatch>
+
+# /api/* é tratado pelo front controller PHP (api/index.php).
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ api/index.php [L]
