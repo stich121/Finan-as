@@ -20,17 +20,30 @@ export async function render(root) {
 
 async function load() {
   const month = getState().selectedMonth;
-  let summary, trend, forecast;
-  try {
-    [summary, trend, forecast] = await Promise.all([
-      api.get(`/dashboard/summary?month=${month}`),
-      api.get('/dashboard/trend?months=6'),
-      api.get('/dashboard/forecast?months=6'),
-    ]);
-  } catch (err) {
-    container.innerHTML = `<div class="empty-state">Erro ao carregar dashboard: ${err.message}</div>`;
-    return;
-  }
+  const results = await Promise.allSettled([
+    api.get(`/dashboard/summary?month=${month}`),
+    api.get('/dashboard/trend?months=6'),
+    api.get('/dashboard/forecast?months=6'),
+  ]);
+  const failedSections = [];
+  if (results[0].status === 'rejected') failedSections.push('resumo');
+  if (results[1].status === 'rejected') failedSections.push('tendência');
+  if (results[2].status === 'rejected') failedSections.push('previsão');
+
+  const summary = results[0].status === 'fulfilled' ? results[0].value : {
+    netWorth: 0,
+    availableBalance: 0,
+    creditCardDebt: 0,
+    income: 0,
+    expense: 0,
+    net: 0,
+    savingsRate: 0,
+    uncategorizedCount: 0,
+    spendingByCategory: [],
+    alerts: [],
+  };
+  const trend = results[1].status === 'fulfilled' ? results[1].value : [];
+  const forecast = results[2].status === 'fulfilled' ? results[2].value : [];
 
   container.innerHTML = '';
   maybeNotify(summary.alerts);
@@ -45,6 +58,14 @@ async function load() {
   container.appendChild(picker);
   picker.querySelector('#prev-month').addEventListener('click', () => { setState({ selectedMonth: addMonths(month, -1) }); load(); });
   picker.querySelector('#next-month').addEventListener('click', () => { setState({ selectedMonth: addMonths(month, 1) }); load(); });
+
+  if (failedSections.length > 0) {
+    container.appendChild(el(`
+      <div class="alert-card warning" role="status">
+        <div><strong>Alguns dados estão temporariamente indisponíveis</strong><span>Não foi possível carregar: ${failedSections.join(', ')}. As demais áreas continuam funcionando.</span></div>
+      </div>
+    `));
+  }
 
   const stats = el(`
     <div>

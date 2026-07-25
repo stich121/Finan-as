@@ -46,12 +46,17 @@ function db_table_exists(PDO $pdo, string $table): bool
         return $cache[$key];
     }
 
-    $stmt = $pdo->prepare(
-        'SELECT COUNT(*) FROM information_schema.tables
-         WHERE table_schema = DATABASE() AND table_name = ?'
-    );
-    $stmt->execute([$table]);
-    return $cache[$key] = (bool) $stmt->fetchColumn();
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = ?'
+        );
+        $stmt->execute([$table]);
+        return $cache[$key] = (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        error_log('[financas-schema] Falha ao consultar tabela ' . $table . ': ' . $e->getMessage());
+        return $cache[$key] = false;
+    }
 }
 
 function db_column_exists(PDO $pdo, string $table, string $column): bool
@@ -62,10 +67,15 @@ function db_column_exists(PDO $pdo, string $table, string $column): bool
         return $cache[$key];
     }
 
-    $stmt = $pdo->prepare(
-        'SELECT COUNT(*) FROM information_schema.columns
-         WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?'
-    );
-    $stmt->execute([$table, $column]);
-    return $cache[$key] = (bool) $stmt->fetchColumn();
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?'
+        );
+        $stmt->execute([$table, $column]);
+        return $cache[$key] = (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        error_log('[financas-schema] Falha ao consultar coluna ' . $table . '.' . $column . ': ' . $e->getMessage());
+        return $cache[$key] = false;
+    }
 }
