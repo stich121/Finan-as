@@ -19,6 +19,12 @@ declare(strict_types=1);
   <?php endif; ?>
   <script>
     if ('serviceWorker' in navigator) {
+      const swReloadKey = 'financas-sw-reloaded-<?= h($assetVersion) ?>';
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (sessionStorage.getItem(swReloadKey)) return;
+        sessionStorage.setItem(swReloadKey, '1');
+        window.location.reload();
+      });
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js?v=<?= h($assetVersion) ?>', { updateViaCache: 'none' })
           .then((registration) => registration.update())
