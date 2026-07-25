@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'financas-v8';
+const CACHE_VERSION = 'financas-v9';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Só pré-cacheamos assets estáticos (CSS/JS/ícones). As páginas .php são renderizadas
@@ -73,7 +73,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.destination === 'style' || request.destination === 'script') {
-    event.respondWith(staticNetworkFirst(request));
+    event.respondWith(staticStaleWhileRevalidate(request));
     return;
   }
 
@@ -91,16 +91,22 @@ async function apiNetworkOnly(request) {
   }
 }
 
-async function staticNetworkFirst(request) {
+async function staticStaleWhileRevalidate(request) {
   const cache = await caches.open(STATIC_CACHE);
-  try {
-    const response = await fetch(request, { cache: 'no-cache' });
-    if (response.ok) cache.put(request, response.clone());
-    return response;
-  } catch {
-    const cached = await cache.match(request) || await cache.match(request, { ignoreSearch: true });
-    return cached || new Response('Offline', { status: 503 });
+  const cached = await cache.match(request) || await cache.match(request, { ignoreSearch: true });
+  const network = fetch(request, { cache: 'no-cache' })
+    .then((response) => {
+      if (response.ok) cache.put(request, response.clone());
+      return response;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    void network;
+    return cached;
   }
+
+  return (await network) || new Response('Offline', { status: 503 });
 }
 
 async function navigationNetworkFirst(request) {

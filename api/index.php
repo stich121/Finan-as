@@ -33,6 +33,13 @@ $resource = $segments[0] ?? '';
 $rest = array_slice($segments, 1);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+// Requisições GET só leem a sessão. Liberar o lock aqui permite que telas como
+// o dashboard executem resumo, tendência e previsão realmente em paralelo.
+// Os dados já carregados permanecem disponíveis em $_SESSION após o fechamento.
+if ($method === 'GET' && session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
 $routes = [
     'auth' => 'auth.php',
     'accounts' => 'accounts.php',

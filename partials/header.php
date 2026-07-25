@@ -48,7 +48,7 @@ $navItems = [
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
-$assetVersion = '20260725.8';
+$assetVersion = '20260725.9';
 $userInitial = '?';
 if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $initialMatch)) {
     $userInitial = strtoupper($initialMatch[0]);
