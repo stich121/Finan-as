@@ -143,9 +143,30 @@ function ofx_confirm(string $userId): void
         $existingFitIds[$row['fit_id']] = true;
     }
 
+    $hasStatus = db_column_exists($pdo, 'transactions', 'status');
+    $hasInvoiceId = db_column_exists($pdo, 'transactions', 'invoice_id');
+    $hasPurchaseDate = db_column_exists($pdo, 'transactions', 'purchase_date');
+    $supportsInvoices = $hasInvoiceId && db_table_exists($pdo, 'credit_card_invoices');
+
+    $insertColumns = [
+        'id', 'user_id', 'account_id', 'category_id', 'type', 'amount', 'date',
+        'description', 'payee', 'memo', 'fit_id', 'source',
+    ];
+    if ($hasStatus) {
+        $insertColumns[] = 'status';
+    }
+    if ($hasInvoiceId) {
+        $insertColumns[] = 'invoice_id';
+    }
+    if ($hasPurchaseDate) {
+        $insertColumns[] = 'purchase_date';
+    }
+    $insertColumns[] = 'created_at';
+    $insertColumns[] = 'updated_at';
+
     $insert = $pdo->prepare(
-        'INSERT IGNORE INTO transactions (id, user_id, account_id, category_id, type, amount, date, description, payee, memo, fit_id, source, status, invoice_id, purchase_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "OFX", "CLEARED", ?, ?, ?, ?)'
+        'INSERT IGNORE INTO transactions (' . implode(', ', $insertColumns) . ')
+         VALUES (' . implode(', ', array_fill(0, count($insertColumns), '?')) . ')'
     );
 
     $pdo->beginTransaction();
@@ -163,10 +184,11 @@ function ofx_confirm(string $userId): void
 
             $categoryId = $categoryOverrides[$rowId] ?? $tx['suggestedCategoryId'] ?? null;
             $invoiceId = null;
-            if ($account['type'] === 'CREDIT_CARD' && $tx['type'] === 'EXPENSE') {
+            if ($supportsInvoices && $account['type'] === 'CREDIT_CARD' && $tx['type'] === 'EXPENSE') {
                 $invoiceId = ensure_card_invoice($pdo, $userId, $account, $tx['date'])['id'];
             }
-            $insert->execute([
+
+            $insertValues = [
                 uuid_v4(),
                 $userId,
                 $accountId,
@@ -178,11 +200,21 @@ function ofx_confirm(string $userId): void
                 $tx['payee'],
                 $tx['memo'],
                 $tx['fitId'],
-                $invoiceId,
-                $account['type'] === 'CREDIT_CARD' ? $tx['date'] : null,
-                now_datetime(),
-                now_datetime(),
-            ]);
+                'OFX',
+            ];
+            if ($hasStatus) {
+                $insertValues[] = 'CLEARED';
+            }
+            if ($hasInvoiceId) {
+                $insertValues[] = $invoiceId;
+            }
+            if ($hasPurchaseDate) {
+                $insertValues[] = $account['type'] === 'CREDIT_CARD' ? $tx['date'] : null;
+            }
+            $insertValues[] = now_datetime();
+            $insertValues[] = now_datetime();
+
+            $insert->execute($insertValues);
             $imported++;
             $totalDelta += (float) $tx['amount'];
             if ($tx['fitId'] !== null) {

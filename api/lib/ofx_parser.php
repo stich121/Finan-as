@@ -34,6 +34,15 @@ function parse_ofx_file(string $raw): array
     // Ex: "<NAME>MERCADO XYZ\n" vira "<NAME>MERCADO XYZ</NAME>\n". Tags já fechadas (contêm '<'
     // antes da quebra de linha) não são tocadas por causa do [^<]+.
     $normalized = preg_replace('/<([A-Za-z0-9.]+)>([^<\r\n]+)\r?\n/', "<\$1>\$2</\$1>\n", $body) ?? $body;
+
+    // Alguns bancos geram OFX 1.x com "&" literal em NAME/MEMO. Isso é válido na
+    // prática SGML desses arquivos, mas não no XML usado internamente pelo parser.
+    // Preserva entidades XML válidas e escapa somente os ampersands avulsos.
+    $normalized = preg_replace(
+        '/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9A-Fa-f]+;)/i',
+        '&amp;',
+        $normalized
+    ) ?? $normalized;
     $normalized = '<XMLROOT>' . $normalized . '</XMLROOT>';
 
     libxml_use_internal_errors(true);
