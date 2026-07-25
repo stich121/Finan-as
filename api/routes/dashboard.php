@@ -34,6 +34,13 @@ function dashboard_summary(string $userId): void
     if (!month_string_valid($month)) {
         error_response('Parâmetro "month" inválido (use YYYY-MM).', 422);
     }
+    $monthStart = DateTime::createFromFormat('!Y-m', $month);
+    if (!$monthStart) {
+        error_response('Mês inválido.', 422);
+    }
+    $monthEnd = (clone $monthStart)->modify('+1 month');
+    $monthStartSql = $monthStart->format('Y-m-d');
+    $monthEndSql = $monthEnd->format('Y-m-d');
 
     $pdo = db();
     $hasTransactionStatus = db_column_exists($pdo, 'transactions', 'status');
@@ -61,16 +68,16 @@ function dashboard_summary(string $userId): void
 
     $incomeStmt = $pdo->prepare(
         "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE user_id = ? AND type = 'INCOME'{$clearedFilter} AND DATE_FORMAT(date, '%Y-%m') = ?"
+         WHERE user_id = ? AND type = 'INCOME'{$clearedFilter} AND date >= ? AND date < ?"
     );
-    $incomeStmt->execute([$userId, $month]);
+    $incomeStmt->execute([$userId, $monthStartSql, $monthEndSql]);
     $income = (float) $incomeStmt->fetchColumn();
 
     $expenseStmt = $pdo->prepare(
         "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE user_id = ? AND type = 'EXPENSE'{$clearedFilter} AND DATE_FORMAT(date, '%Y-%m') = ?"
+         WHERE user_id = ? AND type = 'EXPENSE'{$clearedFilter} AND date >= ? AND date < ?"
     );
-    $expenseStmt->execute([$userId, $month]);
+    $expenseStmt->execute([$userId, $monthStartSql, $monthEndSql]);
     $expense = abs((float) $expenseStmt->fetchColumn());
 
     $byCategoryStmt = $pdo->prepare(
@@ -78,10 +85,10 @@ function dashboard_summary(string $userId): void
          JOIN categories c ON c.id = t.category_id
          WHERE t.user_id = ? AND t.type = 'EXPENSE'"
          . ($hasTransactionStatus ? " AND t.status = 'CLEARED'" : '') .
-         " AND DATE_FORMAT(t.date, '%Y-%m') = ?
+         " AND t.date >= ? AND t.date < ?
          GROUP BY c.id, c.name, c.color ORDER BY total ASC"
     );
-    $byCategoryStmt->execute([$userId, $month]);
+    $byCategoryStmt->execute([$userId, $monthStartSql, $monthEndSql]);
     $spendingByCategory = array_map(function ($row) {
         return [
             'categoryId' => $row['id'],
@@ -94,9 +101,9 @@ function dashboard_summary(string $userId): void
     $uncategorizedStmt = $pdo->prepare(
         "SELECT COUNT(*) FROM transactions
          WHERE user_id = ? AND type = 'EXPENSE'{$clearedFilter}
-           AND category_id IS NULL AND DATE_FORMAT(date, '%Y-%m') = ?"
+           AND category_id IS NULL AND date >= ? AND date < ?"
     );
-    $uncategorizedStmt->execute([$userId, $month]);
+    $uncategorizedStmt->execute([$userId, $monthStartSql, $monthEndSql]);
     $uncategorized = (int) $uncategorizedStmt->fetchColumn();
 
     $alerts = [];
@@ -137,8 +144,9 @@ function dashboard_summary(string $userId): void
              LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
                AND t.type = 'EXPENSE'"
              . ($hasTransactionStatus ? " AND t.status = 'CLEARED'" : '') .
-             " AND DATE_FORMAT(t.date, '%Y-%m') = b.month
-             WHERE b.user_id = ? AND b.month = ?
+             " AND t.date >= STR_TO_DATE(CONCAT(b.month, '-01'), '%Y-%m-%d')
+               AND t.date < DATE_ADD(STR_TO_DATE(CONCAT(b.month, '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH)
+             WHERE b.user_id = ? AND BINARY b.month = BINARY ?
              GROUP BY b.id, c.name, b.amount
              HAVING spent >= b.amount * 0.8 ORDER BY spent / NULLIF(b.amount, 0) DESC LIMIT 5"
         );
