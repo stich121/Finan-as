@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../lib/finance.php';
+
 const RECURRING_FREQUENCIES = ['WEEKLY', 'BIWEEKLY', 'MONTHLY', 'YEARLY'];
 
 function handle_route(array $segments, string $method): void
@@ -191,10 +193,18 @@ function recurring_post_next(string $userId, string $id): void
     $pdo = db();
     $pdo->beginTransaction();
     try {
+        $invoiceId = null;
+        if ($account['type'] === 'CREDIT_CARD' && $r['type'] === 'EXPENSE') {
+            $invoiceId = ensure_card_invoice($pdo, $userId, $account, $postedDate)['id'];
+        }
         $pdo->prepare(
-            'INSERT INTO transactions (id, user_id, account_id, category_id, type, amount, date, description, source, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, "MANUAL", ?, ?)'
-        )->execute([$txId, $userId, $r['account_id'], $r['category_id'], $r['type'], $signedAmount, $postedDate, $r['description'], now_datetime(), now_datetime()]);
+            'INSERT INTO transactions (id, user_id, account_id, category_id, type, amount, date, description, source, status, invoice_id, purchase_date, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, "MANUAL", "CLEARED", ?, ?, ?, ?)'
+        )->execute([
+            $txId, $userId, $r['account_id'], $r['category_id'], $r['type'], $signedAmount,
+            $postedDate, $r['description'], $invoiceId, $invoiceId ? $postedDate : null,
+            now_datetime(), now_datetime(),
+        ]);
 
         $pdo->prepare('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?')
             ->execute([$signedAmount, now_datetime(), $r['account_id']]);

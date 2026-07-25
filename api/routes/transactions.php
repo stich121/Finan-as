@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/matcher.php';
+require_once __DIR__ . '/../lib/finance.php';
 
 const TX_TYPES = ['INCOME', 'EXPENSE', 'TRANSFER'];
+const TX_STATUSES = ['PENDING', 'CLEARED'];
 
 function handle_route(array $segments, string $method): void
 {
@@ -65,6 +67,11 @@ function tx_find(string $userId, string $id): ?array
     return $row ?: null;
 }
 
+function tx_affects_balance(array $account, string $status): bool
+{
+    return $account['type'] === 'CREDIT_CARD' || $status === 'CLEARED';
+}
+
 function tx_tags_for(array $ids): array
 {
     if (empty($ids)) {
@@ -99,6 +106,12 @@ function tx_out(array $t, array $tagsByTx = []): array
         'transferAccountId' => $t['transfer_account_id'],
         'transferGroupId' => $t['transfer_group_id'],
         'source' => $t['source'],
+        'status' => $t['status'] ?? 'CLEARED',
+        'invoiceId' => $t['invoice_id'] ?? null,
+        'installmentGroupId' => $t['installment_group_id'] ?? null,
+        'installmentNumber' => isset($t['installment_number']) ? (int) $t['installment_number'] : null,
+        'installmentCount' => isset($t['installment_count']) ? (int) $t['installment_count'] : null,
+        'purchaseDate' => $t['purchase_date'] ?? null,
         'tags' => $tagsByTx[$t['id']] ?? [],
         'createdAt' => $t['created_at'],
     ];
@@ -121,6 +134,11 @@ function transactions_list(string $userId): void
         require_enum('type', $_GET['type'], TX_TYPES);
         $where[] = 'type = ?';
         $params[] = $_GET['type'];
+    }
+    if (!empty($_GET['status'])) {
+        require_enum('status', $_GET['status'], TX_STATUSES);
+        $where[] = 'status = ?';
+        $params[] = $_GET['status'];
     }
     if (!empty($_GET['uncategorizedOnly']) && $_GET['uncategorizedOnly'] !== '0') {
         $where[] = 'category_id IS NULL';
@@ -192,6 +210,8 @@ function transactions_create(string $userId): void
     $description = $data['description'] ?? null;
     $payee = $data['payee'] ?? null;
     $memo = $data['memo'] ?? null;
+    $status = (string) ($data['status'] ?? 'CLEARED');
+    require_enum('status', $status, TX_STATUSES);
 
     $pdo = db();
 
@@ -242,16 +262,67 @@ function transactions_create(string $userId): void
         ]);
     }
 
+    $installmentCount = max(1, min(60, (int) ($data['installmentCount'] ?? 1)));
+    if ($installmentCount > 1 && ($data['type'] !== 'EXPENSE' || $account['type'] !== 'CREDIT_CARD')) {
+        error_response('Parcelamento está disponível apenas para despesas no cartão de crédito.', 422);
+    }
+
     $id = uuid_v4();
+    $installmentGroupId = null;
     $pdo->beginTransaction();
     try {
-        $pdo->prepare(
-            'INSERT INTO transactions (id, user_id, account_id, category_id, type, amount, date, description, payee, memo, source, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "MANUAL", ?, ?)'
-        )->execute([$id, $userId, $account['id'], $categoryId, $data['type'], $signedAmount, $date, $description, $payee, $memo, now_datetime(), now_datetime()]);
+        if ($data['type'] === 'EXPENSE' && $account['type'] === 'CREDIT_CARD') {
+            $groupId = $installmentCount > 1 ? uuid_v4() : null;
+            $installmentGroupId = $groupId;
+            $totalCents = (int) round(abs($amount) * 100);
+            $baseCents = intdiv($totalCents, $installmentCount);
+            $remainder = $totalCents % $installmentCount;
+            $purchase = new DateTime($date);
+            $insert = $pdo->prepare(
+                'INSERT INTO transactions
+                 (id, user_id, account_id, category_id, type, amount, date, description, payee, memo, source, status, invoice_id, installment_group_id, installment_number, installment_count, purchase_date, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, "EXPENSE", ?, ?, ?, ?, ?, "MANUAL", ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
 
-        $pdo->prepare('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?')
-            ->execute([$signedAmount, now_datetime(), $account['id']]);
+            for ($i = 1; $i <= $installmentCount; $i++) {
+                $installmentDate = clone $purchase;
+                if ($i > 1) {
+                    $installmentDate->modify('first day of +' . ($i - 1) . ' month');
+                    $installmentDate->setDate(
+                        (int) $installmentDate->format('Y'),
+                        (int) $installmentDate->format('m'),
+                        min(28, (int) $purchase->format('d'))
+                    );
+                }
+                $invoice = ensure_card_invoice($pdo, $userId, $account, $installmentDate->format('Y-m-d'));
+                $partCents = $baseCents + ($i <= $remainder ? 1 : 0);
+                $partAmount = -($partCents / 100);
+                $partId = $i === 1 ? $id : uuid_v4();
+                $partStatus = $i === 1 ? $status : 'PENDING';
+                $partDescription = $installmentCount > 1
+                    ? trim((string) ($description ?: $payee ?: 'Compra parcelada')) . " ($i/$installmentCount)"
+                    : $description;
+                $insert->execute([
+                    $partId, $userId, $account['id'], $categoryId, $partAmount,
+                    $installmentDate->format('Y-m-d'), $partDescription, $payee, $memo,
+                    $partStatus, $invoice['id'], $groupId,
+                    $installmentCount > 1 ? $i : null,
+                    $installmentCount > 1 ? $installmentCount : null,
+                    $date, now_datetime(), now_datetime(),
+                ]);
+            }
+        } else {
+            $pdo->prepare(
+                'INSERT INTO transactions
+                 (id, user_id, account_id, category_id, type, amount, date, description, payee, memo, source, status, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "MANUAL", ?, ?, ?)'
+            )->execute([$id, $userId, $account['id'], $categoryId, $data['type'], $signedAmount, $date, $description, $payee, $memo, $status, now_datetime(), now_datetime()]);
+        }
+
+        if (tx_affects_balance($account, $status)) {
+            $pdo->prepare('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?')
+                ->execute([$signedAmount, now_datetime(), $account['id']]);
+        }
 
         $pdo->commit();
     } catch (Throwable $e) {
@@ -259,7 +330,15 @@ function transactions_create(string $userId): void
         throw $e;
     }
 
-    transactions_sync_tags($id, $data['tagIds'] ?? []);
+    if ($installmentGroupId) {
+        $tagStmt = $pdo->prepare('SELECT id FROM transactions WHERE installment_group_id = ? AND user_id = ?');
+        $tagStmt->execute([$installmentGroupId, $userId]);
+        foreach ($tagStmt->fetchAll() as $part) {
+            transactions_sync_tags($part['id'], $data['tagIds'] ?? []);
+        }
+    } else {
+        transactions_sync_tags($id, $data['tagIds'] ?? []);
+    }
     json_response(tx_out(tx_find($userId, $id), tx_tags_for([$id])), 201);
 }
 
@@ -285,6 +364,9 @@ function transactions_update(string $userId, string $id): void
     if ($tx['type'] === 'TRANSFER') {
         error_response('Transferências não podem ser editadas. Exclua e crie uma nova.', 422);
     }
+    if (!empty($tx['installment_group_id'])) {
+        error_response('Para alterar uma compra parcelada, exclua as parcelas e lance a compra novamente.', 422);
+    }
 
     $data = read_json_body();
     $type = $data['type'] ?? $tx['type'];
@@ -304,21 +386,36 @@ function transactions_update(string $userId, string $id): void
         'description' => array_key_exists('description', $data) ? $data['description'] : $tx['description'],
         'payee' => array_key_exists('payee', $data) ? $data['payee'] : $tx['payee'],
         'memo' => array_key_exists('memo', $data) ? $data['memo'] : $tx['memo'],
+        'status' => array_key_exists('status', $data) ? $data['status'] : ($tx['status'] ?? 'CLEARED'),
     ];
+    require_enum('status', $fields['status'], TX_STATUSES);
 
     $pdo = db();
     $pdo->beginTransaction();
     try {
+        $newInvoiceId = null;
+        if ($type === 'EXPENSE' && $newAccount['type'] === 'CREDIT_CARD') {
+            $newInvoiceId = ensure_card_invoice($pdo, $userId, $newAccount, $fields['date'])['id'];
+        }
         $oldSignedAmount = (float) $tx['amount'];
         $accountChanged = $newAccount['id'] !== $tx['account_id'];
+        $oldAccount = tx_find_account($userId, $tx['account_id']);
+        $oldAffects = $oldAccount ? tx_affects_balance($oldAccount, $tx['status'] ?? 'CLEARED') : false;
+        $newAffects = tx_affects_balance($newAccount, $fields['status']);
 
         if ($accountChanged) {
-            $pdo->prepare('UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?')
-                ->execute([$oldSignedAmount, now_datetime(), $tx['account_id']]);
-            $pdo->prepare('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?')
-                ->execute([$newSignedAmount, now_datetime(), $newAccount['id']]);
+            if ($oldAffects) {
+                $pdo->prepare('UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?')
+                    ->execute([$oldSignedAmount, now_datetime(), $tx['account_id']]);
+            }
+            if ($newAffects) {
+                $pdo->prepare('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?')
+                    ->execute([$newSignedAmount, now_datetime(), $newAccount['id']]);
+            }
         } else {
-            $diff = round($newSignedAmount - $oldSignedAmount, 2);
+            $oldContribution = $oldAffects ? $oldSignedAmount : 0.0;
+            $newContribution = $newAffects ? $newSignedAmount : 0.0;
+            $diff = round($newContribution - $oldContribution, 2);
             if (abs($diff) >= 0.01) {
                 $pdo->prepare('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?')
                     ->execute([$diff, now_datetime(), $newAccount['id']]);
@@ -326,7 +423,7 @@ function transactions_update(string $userId, string $id): void
         }
 
         $pdo->prepare(
-            'UPDATE transactions SET account_id = ?, category_id = ?, type = ?, amount = ?, date = ?, description = ?, payee = ?, memo = ?, updated_at = ?
+            'UPDATE transactions SET account_id = ?, category_id = ?, type = ?, amount = ?, date = ?, description = ?, payee = ?, memo = ?, status = ?, invoice_id = ?, purchase_date = ?, updated_at = ?
              WHERE id = ? AND user_id = ?'
         )->execute([
             $newAccount['id'],
@@ -337,6 +434,9 @@ function transactions_update(string $userId, string $id): void
             $fields['description'],
             $fields['payee'],
             $fields['memo'],
+            $fields['status'],
+            $newInvoiceId,
+            $newInvoiceId ? $fields['date'] : null,
             now_datetime(),
             $id,
             $userId,
@@ -365,7 +465,16 @@ function transactions_delete(string $userId, string $id): void
     $pdo = db();
     $pdo->beginTransaction();
     try {
-        if ($tx['type'] === 'TRANSFER' && $tx['transfer_group_id']) {
+        if (!empty($tx['installment_group_id'])) {
+            $stmt = $pdo->prepare('SELECT * FROM transactions WHERE installment_group_id = ? AND user_id = ?');
+            $stmt->execute([$tx['installment_group_id'], $userId]);
+            $parts = $stmt->fetchAll();
+            $total = array_sum(array_map(static fn($part) => (float) $part['amount'], $parts));
+            $pdo->prepare('UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?')
+                ->execute([$total, now_datetime(), $tx['account_id']]);
+            $pdo->prepare('DELETE FROM transactions WHERE installment_group_id = ? AND user_id = ?')
+                ->execute([$tx['installment_group_id'], $userId]);
+        } elseif ($tx['type'] === 'TRANSFER' && $tx['transfer_group_id']) {
             $stmt = $pdo->prepare('SELECT * FROM transactions WHERE transfer_group_id = ? AND user_id = ?');
             $stmt->execute([$tx['transfer_group_id'], $userId]);
             $legs = $stmt->fetchAll();
@@ -375,8 +484,11 @@ function transactions_delete(string $userId, string $id): void
             }
             $pdo->prepare('DELETE FROM transactions WHERE transfer_group_id = ? AND user_id = ?')->execute([$tx['transfer_group_id'], $userId]);
         } else {
-            $pdo->prepare('UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?')
-                ->execute([(float) $tx['amount'], now_datetime(), $tx['account_id']]);
+            $account = tx_find_account($userId, $tx['account_id']);
+            if ($account && tx_affects_balance($account, $tx['status'] ?? 'CLEARED')) {
+                $pdo->prepare('UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?')
+                    ->execute([(float) $tx['amount'], now_datetime(), $tx['account_id']]);
+            }
             $pdo->prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?')->execute([$id, $userId]);
         }
 

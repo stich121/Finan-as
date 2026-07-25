@@ -26,6 +26,10 @@ function handle_route(array $segments, string $method): void
         auth_change_password();
         return;
     }
+    if ($action === 'preferences' && $method === 'PATCH') {
+        auth_update_preferences();
+        return;
+    }
 
     error_response('Rota de autenticação não encontrada.', 404);
 }
@@ -160,6 +164,20 @@ function auth_change_password(): void
     // Invalida a sessão atual e força novo login, como acontecia com a revogação de refresh tokens.
     logout_user();
     json_response(['ok' => true]);
+}
+
+function auth_update_preferences(): void
+{
+    $userId = require_login();
+    require_csrf();
+    $data = read_json_body();
+    $theme = (string) ($data['theme'] ?? 'system');
+    require_enum('theme', $theme, ['system', 'light', 'dark']);
+    db()->prepare('UPDATE users SET theme = ?, updated_at = ? WHERE id = ?')
+        ->execute([$theme, now_datetime(), $userId]);
+    $stmt = db()->prepare('SELECT * FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    json_response(auth_public_user($stmt->fetch()));
 }
 
 /**

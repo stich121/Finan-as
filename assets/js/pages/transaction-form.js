@@ -63,6 +63,15 @@ export async function openTransactionForm({ transaction = null, defaultAccountId
           <label for="tx-account">${type === 'TRANSFER' ? 'Conta de origem' : 'Conta'}</label>
           <select id="tx-account" name="accountId">${accounts.map((a) => `<option value="${a.id}" ${(transaction?.accountId || defaultAccountId) === a.id ? 'selected' : ''}>${escapeHtml(a.name)}</option>`).join('')}</select>
         </div>
+        <div id="credit-purchase-fields" hidden>
+          <div class="field">
+            <label for="tx-installments">Parcelas</label>
+            <select id="tx-installments" name="installmentCount">
+              ${Array.from({ length: 24 }, (_, i) => i + 1).map((count) => `<option value="${count}">${count === 1 ? 'À vista' : `${count}x`}</option>`).join('')}
+            </select>
+            <p class="hint">O valor informado é o total da compra. As parcelas serão distribuídas automaticamente nas faturas.</p>
+          </div>
+        </div>
         ${type === 'TRANSFER' ? `
         <div class="field">
           <label for="tx-transfer-account">Conta de destino</label>
@@ -84,6 +93,13 @@ export async function openTransactionForm({ transaction = null, defaultAccountId
           <select id="tx-category" name="categoryId">
             <option value="">Sem categoria</option>
             ${categoryOptions(type)}
+          </select>
+        </div>
+        <div class="field">
+          <label for="tx-status">Situação</label>
+          <select id="tx-status" name="status">
+            <option value="CLEARED" ${transaction?.status !== 'PENDING' ? 'selected' : ''}>Confirmada</option>
+            <option value="PENDING" ${transaction?.status === 'PENDING' ? 'selected' : ''}>Pendente</option>
           </select>
         </div>` : ''}
         <div class="field">
@@ -137,6 +153,14 @@ export async function openTransactionForm({ transaction = null, defaultAccountId
 
     const form = content.querySelector('#tx-form');
     const errorEl = content.querySelector('#tx-form-error');
+    const accountSelect = content.querySelector('#tx-account');
+    const creditFields = content.querySelector('#credit-purchase-fields');
+    const updateCreditFields = () => {
+      const account = accounts.find((item) => item.id === accountSelect.value);
+      creditFields.hidden = type !== 'EXPENSE' || account?.type !== 'CREDIT_CARD' || isEdit;
+    };
+    accountSelect.addEventListener('change', updateCreditFields);
+    updateCreditFields();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -149,12 +173,14 @@ export async function openTransactionForm({ transaction = null, defaultAccountId
         date: data.get('date'),
         description: data.get('description') || null,
         payee: data.get('payee') || null,
+        status: data.get('status') || 'CLEARED',
       };
       if (type === 'TRANSFER') {
         payload.transferAccountId = data.get('transferAccountId');
       } else {
         payload.categoryId = data.get('categoryId') || null;
         payload.tagIds = Array.from(selectedTagIds);
+        if (type === 'EXPENSE') payload.installmentCount = Number(data.get('installmentCount') || 1);
       }
 
       try {

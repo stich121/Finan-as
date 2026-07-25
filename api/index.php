@@ -45,6 +45,8 @@ $routes = [
     'dashboard' => 'dashboard.php',
     'ofx' => 'ofx.php',
     'goals' => 'goals.php',
+    'cards' => 'cards.php',
+    'reports' => 'reports.php',
 ];
 
 if ($resource === '' || !isset($routes[$resource])) {

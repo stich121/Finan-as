@@ -23,7 +23,7 @@ function escapeHtml(str) {
 
 function paintUpload() {
   container.innerHTML = '';
-  container.appendChild(el('<div class="section-title"><h2>Importar extrato OFX</h2></div>'));
+  container.appendChild(el('<div class="section-title"><h2>Importar extrato</h2></div>'));
 
   const card = el(`
     <div class="card">
@@ -33,8 +33,9 @@ function paintUpload() {
           <select id="ofx-account" name="accountId">${accounts.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select>
         </div>
         <div class="field">
-          <label for="ofx-file">Arquivo .ofx / .qfx</label>
-          <input id="ofx-file" name="file" type="file" accept=".ofx,.qfx,application/xml,text/xml,text/plain" required />
+          <label for="ofx-file">Arquivo .ofx, .qfx ou .csv</label>
+          <input id="ofx-file" name="file" type="file" accept=".ofx,.qfx,.csv,application/xml,text/xml,text/plain,text/csv" required />
+          <p class="hint">CSV: use colunas Data e Valor (ou Débito/Crédito). Descrição, Histórico e Beneficiário são reconhecidos automaticamente.</p>
         </div>
         <div class="field-error" id="upload-error" hidden></div>
         <button type="submit" class="btn" id="upload-btn">Analisar arquivo</button>

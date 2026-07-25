@@ -39,14 +39,16 @@ async function load() {
     card.innerHTML = '<div class="empty-state">Nenhuma conta cadastrada ainda.</div>';
   } else {
     accounts.forEach((acc) => {
+      const isCard = acc.type === 'CREDIT_CARD';
       const item = el(`
         <div class="list-item">
           <div class="meta">
             <div class="title">${acc.archived ? `<span class="inline-icon">${icon('archive', { size: 14 })}</span> ` : ''}${escapeHtml(acc.name)}</div>
-            <div class="subtitle">${ACCOUNT_TYPE_LABELS[acc.type] || acc.type}${acc.institution ? ' · ' + escapeHtml(acc.institution) : ''}</div>
+            <div class="subtitle">${ACCOUNT_TYPE_LABELS[acc.type] || acc.type}${acc.institution ? ' · ' + escapeHtml(acc.institution) : ''}${isCard && acc.dueDate ? ` · vence ${formatDateSafe(acc.dueDate)}` : ''}</div>
+            ${isCard ? `<div class="account-card-metrics"><span>Fatura ${formatCurrency(acc.currentInvoice || 0)}</span><span>Disponível ${formatCurrency(acc.availableLimit || 0)}</span></div>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div class="amount ${acc.balance < 0 ? 'expense' : 'income'}">${formatCurrency(acc.balance)}</div>
+            <div class="amount ${acc.balance < 0 ? 'expense' : 'income'}">${isCard ? formatCurrency(Math.abs(acc.balance)) : formatCurrency(acc.balance)}</div>
             <button class="btn ghost" data-action="edit" data-id="${acc.id}">${icon('edit', { size: 16 })}</button>
           </div>
         </div>
@@ -63,6 +65,11 @@ async function load() {
   });
 
   header.querySelector('#new-account-btn').addEventListener('click', () => openAccountForm(null));
+}
+
+function formatDateSafe(date) {
+  const [year, month, day] = date.slice(0, 10).split('-');
+  return `${day}/${month}`;
 }
 
 function escapeHtml(str) {
@@ -87,12 +94,29 @@ function openAccountForm(account) {
             .join('')}
         </select>
       </div>
+      <div id="credit-card-fields" ${account?.type === 'CREDIT_CARD' ? '' : 'hidden'}>
+        <div class="field">
+          <label for="acc-limit">Limite total</label>
+          <input id="acc-limit" name="creditLimit" type="number" min="0.01" step="0.01" value="${account?.creditLimit ?? ''}" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="acc-closing-day">Dia do fechamento</label>
+            <input id="acc-closing-day" name="closingDay" type="number" min="1" max="28" value="${account?.closingDay ?? ''}" />
+          </div>
+          <div class="field">
+            <label for="acc-due-day">Dia do vencimento</label>
+            <input id="acc-due-day" name="dueDay" type="number" min="1" max="28" value="${account?.dueDay ?? ''}" />
+          </div>
+        </div>
+        <p class="hint">Compras feitas após o fechamento entram automaticamente na fatura seguinte.</p>
+      </div>
       <div class="field">
         <label for="acc-institution">Instituição (opcional)</label>
         <input id="acc-institution" name="institution" value="${account ? escapeHtml(account.institution || '') : ''}" />
       </div>
       ${!isEdit ? `
-      <div class="field">
+      <div class="field" id="initial-balance-field">
         <label for="acc-balance">Saldo inicial</label>
         <input id="acc-balance" name="balance" type="number" step="0.01" value="0" />
       </div>` : ''}
@@ -113,6 +137,17 @@ function openAccountForm(account) {
 
   const modal = openModal({ title: isEdit ? 'Editar conta' : 'Nova conta', contentEl: form });
   const errorEl = form.querySelector('#acc-form-error');
+  const typeSelect = form.querySelector('#acc-type');
+  const cardFields = form.querySelector('#credit-card-fields');
+  const toggleCardFields = () => {
+    const isCard = typeSelect.value === 'CREDIT_CARD';
+    cardFields.hidden = !isCard;
+    cardFields.querySelectorAll('input').forEach((input) => { input.required = isCard; });
+    const balanceField = form.querySelector('#initial-balance-field');
+    if (balanceField) balanceField.hidden = isCard;
+  };
+  typeSelect.addEventListener('change', toggleCardFields);
+  toggleCardFields();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -122,8 +157,11 @@ function openAccountForm(account) {
       name: data.get('name'),
       type: data.get('type'),
       institution: data.get('institution') || null,
+      creditLimit: data.get('type') === 'CREDIT_CARD' ? Number(data.get('creditLimit')) : null,
+      closingDay: data.get('type') === 'CREDIT_CARD' ? Number(data.get('closingDay')) : null,
+      dueDay: data.get('type') === 'CREDIT_CARD' ? Number(data.get('dueDay')) : null,
     };
-    if (!isEdit) payload.balance = Number(data.get('balance') || 0);
+    if (!isEdit) payload.balance = data.get('type') === 'CREDIT_CARD' ? 0 : Number(data.get('balance') || 0);
 
     try {
       if (isEdit) {

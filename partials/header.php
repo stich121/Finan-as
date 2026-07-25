@@ -45,12 +45,12 @@ $navItems = [
     ['key' => 'dashboard', 'href' => '/index.php', 'icon' => 'home', 'label' => 'Início'],
     ['key' => 'transactions', 'href' => '/transactions.php', 'icon' => 'card', 'label' => 'Transações'],
     ['key' => 'accounts', 'href' => '/accounts.php', 'icon' => 'bank', 'label' => 'Contas'],
-    ['key' => 'budgets', 'href' => '/budgets.php', 'icon' => 'target', 'label' => 'Orçamento'],
-    ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Ajustes'],
+    ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
+    ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
 ?>
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="<?= h($currentUser['theme'] ?? 'system') ?>">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -64,6 +64,15 @@ $navItems = [
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Finanças" />
   <link rel="stylesheet" href="/assets/css/styles.css" />
+  <script>
+    (() => {
+      const pref = document.documentElement.dataset.theme;
+      const resolved = pref === 'system'
+        ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        : pref;
+      document.documentElement.dataset.resolvedTheme = resolved;
+    })();
+  </script>
   <?php if ($currentUser): ?>
   <script>
     window.__APP_STATE__ = <?= json_encode([

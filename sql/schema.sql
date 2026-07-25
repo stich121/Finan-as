@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   balance     DECIMAL(14,2) NOT NULL DEFAULT 0,
   color       VARCHAR(20)   NULL,
   archived    TINYINT(1)    NOT NULL DEFAULT 0,
+  credit_limit DECIMAL(14,2) NULL, -- só cartão de crédito
+  closing_day  TINYINT      NULL, -- dia do fechamento da fatura (1-28)
+  due_day      TINYINT      NULL, -- dia do vencimento da fatura (1-28)
   created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_accounts_user (user_id),
@@ -72,6 +75,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   transfer_account_id CHAR(36)     NULL,
   transfer_group_id  CHAR(36)      NULL,
   source             ENUM('MANUAL','OFX') NOT NULL DEFAULT 'MANUAL',
+  status             ENUM('PENDING','CLEARED') NOT NULL DEFAULT 'CLEARED',
+  invoice_id         CHAR(36)      NULL,
+  installment_group_id CHAR(36)    NULL,
+  installment_number SMALLINT      NULL,
+  installment_count SMALLINT       NULL,
+  purchase_date      DATE          NULL,
   created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_transactions_account_fit (account_id, fit_id),
@@ -80,11 +89,36 @@ CREATE TABLE IF NOT EXISTS transactions (
   KEY idx_transactions_category (category_id),
   KEY idx_transactions_date (date),
   KEY idx_transactions_transfer_group (transfer_group_id),
+  KEY idx_transactions_invoice (invoice_id),
+  KEY idx_transactions_installment_group (installment_group_id),
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_transactions_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
   CONSTRAINT fk_transactions_transfer_account FOREIGN KEY (transfer_account_id) REFERENCES accounts(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS credit_card_invoices (
+  id           CHAR(36)      NOT NULL PRIMARY KEY,
+  user_id      CHAR(36)      NOT NULL,
+  account_id   CHAR(36)      NOT NULL,
+  cycle_month  CHAR(7)       NOT NULL, -- mês do vencimento: YYYY-MM
+  closing_date DATE          NOT NULL,
+  due_date     DATE          NOT NULL,
+  status       ENUM('OPEN','CLOSED','PAID','OVERDUE') NOT NULL DEFAULT 'OPEN',
+  paid_amount  DECIMAL(14,2) NOT NULL DEFAULT 0,
+  paid_at      DATETIME      NULL,
+  created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_invoice_account_month (account_id, cycle_month),
+  KEY idx_invoices_user_due (user_id, due_date),
+  KEY idx_invoices_account (account_id),
+  CONSTRAINT fk_invoices_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_invoices_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE transactions
+  ADD CONSTRAINT fk_transactions_invoice
+  FOREIGN KEY (invoice_id) REFERENCES credit_card_invoices(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS transaction_tags (
   transaction_id CHAR(36) NOT NULL,
