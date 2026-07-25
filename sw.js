@@ -1,6 +1,5 @@
-const CACHE_VERSION = 'financas-v3';
+const CACHE_VERSION = 'financas-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const API_CACHE = `${CACHE_VERSION}-api`;
 
 // Só pré-cacheamos assets estáticos (CSS/JS/ícones). As páginas .php são renderizadas
 // no servidor por sessão (nav ativo, dados do usuário) e não devem ficar presas em cache;
@@ -20,6 +19,7 @@ const PRECACHE_URLS = [
   '/assets/js/pages/register.js',
   '/assets/js/pages/dashboard.js',
   '/assets/js/pages/accounts.js',
+  '/assets/js/pages/cards.js',
   '/assets/js/pages/categories.js',
   '/assets/js/pages/tags.js',
   '/assets/js/pages/goals.js',
@@ -30,6 +30,7 @@ const PRECACHE_URLS = [
   '/assets/js/pages/budgets.js',
   '/assets/js/pages/recurring.js',
   '/assets/js/pages/settings.js',
+  '/assets/js/pages/reports.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
@@ -47,7 +48,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('financas-') && key !== STATIC_CACHE && key !== API_CACHE)
+          .filter((key) => key.startsWith('financas-') && key !== STATIC_CACHE)
           .map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
@@ -62,7 +63,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request, API_CACHE));
+    event.respondWith(apiNetworkOnly(request));
     return;
   }
 
@@ -74,15 +75,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(cacheFirst(request));
 });
 
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
+async function apiNetworkOnly(request) {
   try {
-    const response = await fetch(request);
-    if (response.ok) cache.put(request, response.clone());
-    return response;
+    return await fetch(request);
   } catch {
-    const cached = await cache.match(request);
-    if (cached) return cached;
     return new Response(JSON.stringify({ error: 'Sem conexão com o servidor.' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json' },

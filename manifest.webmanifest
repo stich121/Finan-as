@@ -2,13 +2,34 @@
   "id": "/",
   "name": "Finanças",
   "short_name": "Finanças",
-  "description": "Controle financeiro pessoal: contas, categorias, orçamento e importação de extratos OFX.",
+  "description": "Controle completo de contas, cartões, faturas, parcelas, orçamentos, metas e extratos OFX.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Nova transação",
+      "short_name": "Nova transação",
+      "url": "/transactions.php",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Cartões e faturas",
+      "short_name": "Cartões",
+      "url": "/cards.php",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Importar OFX",
+      "short_name": "Importar",
+      "url": "/transactions-import.php",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

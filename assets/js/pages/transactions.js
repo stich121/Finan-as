@@ -9,7 +9,7 @@ import { icon } from '../icons.js';
 let container;
 let accounts = [];
 let categories = [];
-let filters = { accountId: '', categoryId: '', type: '', uncategorizedOnly: false, search: '' };
+let filters = { accountId: '', categoryId: '', type: '', status: '', uncategorizedOnly: false, search: '' };
 let page = 1;
 const pageSize = 30;
 let selectedIds = new Set();
@@ -60,6 +60,11 @@ function buildFilters() {
         <option value="EXPENSE">Despesa</option>
         <option value="TRANSFER">Transferência</option>
       </select>
+      <select id="f-status">
+        <option value="">Todas as situações</option>
+        <option value="CLEARED">Confirmadas</option>
+        <option value="PENDING">Pendentes</option>
+      </select>
       <input id="f-search" type="search" placeholder="Buscar…" />
       <label class="chip"><input type="checkbox" id="f-uncategorized" style="margin-right:4px;" />Sem categoria</label>
     </div>
@@ -69,6 +74,7 @@ function buildFilters() {
   wrap.querySelector('#f-account').addEventListener('change', (e) => { filters.accountId = e.target.value; page = 1; loadList(); });
   wrap.querySelector('#f-category').addEventListener('change', (e) => { filters.categoryId = e.target.value; page = 1; loadList(); });
   wrap.querySelector('#f-type').addEventListener('change', (e) => { filters.type = e.target.value; page = 1; loadList(); });
+  wrap.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; page = 1; loadList(); });
   wrap.querySelector('#f-uncategorized').addEventListener('change', (e) => { filters.uncategorizedOnly = e.target.checked; page = 1; loadList(); });
   wrap.querySelector('#f-search').addEventListener('input', debounce((e) => { filters.search = e.target.value; page = 1; loadList(); }, 350));
 }
@@ -81,6 +87,7 @@ async function loadList() {
   if (filters.accountId) params.set('accountId', filters.accountId);
   if (filters.categoryId) params.set('categoryId', filters.categoryId);
   if (filters.type) params.set('type', filters.type);
+  if (filters.status) params.set('status', filters.status);
   if (filters.uncategorizedOnly) params.set('uncategorizedOnly', '1');
   if (filters.search) params.set('search', filters.search);
   params.set('page', page);
@@ -125,8 +132,8 @@ async function loadList() {
       <div class="list-item">
         <input type="checkbox" class="tx-check" data-id="${tx.id}" style="margin-right:4px;" />
         <div class="meta" style="flex:1;cursor:pointer;">
-          <div class="title">${escapeHtml(tx.description || tx.payee || 'Sem descrição')}</div>
-          <div class="subtitle">${formatDate(tx.date)} · ${account ? escapeHtml(account.name) : ''}${category ? ' · ' + escapeHtml(category.name) : tx.type !== 'TRANSFER' ? ' · <span style="color:var(--warning)">sem categoria</span>' : ''}</div>
+          <div class="title">${escapeHtml(tx.description || tx.payee || 'Sem descrição')} ${tx.status === 'PENDING' ? '<span class="status-badge pending">Pendente</span>' : ''}</div>
+          <div class="subtitle">${formatDate(tx.date)} · ${account ? escapeHtml(account.name) : ''}${category ? ' · ' + escapeHtml(category.name) : tx.type !== 'TRANSFER' ? ' · <span style="color:var(--warning)">sem categoria</span>' : ''}${tx.installmentCount ? ` · parcela ${tx.installmentNumber}/${tx.installmentCount}` : ''}</div>
           ${tx.tags && tx.tags.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${tx.tags.map((t) => `<span class="chip" style="border-color:${t.color || 'var(--border)'};"><span class="dot" style="background:${t.color || '#64748b'}"></span> ${escapeHtml(t.name)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="amount ${tx.amount < 0 ? 'expense' : 'income'}">${formatCurrency(tx.amount)}</div>
@@ -181,7 +188,7 @@ function openTransactionDetail(tx, account, category) {
       <label class="chip" style="margin-bottom:14px;display:inline-flex;"><input type="checkbox" id="learn-rule" style="margin-right:4px;" />Lembrar essa categorização</label>
       ` : ''}
       <div class="btn-row">
-        ${tx.type !== 'TRANSFER' ? '<button class="btn secondary" id="edit-tx-btn">Editar</button>' : ''}
+        ${tx.type !== 'TRANSFER' && !tx.installmentGroupId ? '<button class="btn secondary" id="edit-tx-btn">Editar</button>' : ''}
         <button class="btn danger" id="delete-tx-btn">Excluir</button>
       </div>
     </div>
@@ -216,7 +223,9 @@ function openTransactionDetail(tx, account, category) {
   content.querySelector('#delete-tx-btn').addEventListener('click', async () => {
     const ok = await confirmDialog({
       title: 'Excluir transação',
-      message: 'Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.',
+      message: tx.installmentGroupId
+        ? 'Esta compra é parcelada. Todas as parcelas serão excluídas e o limite do cartão será recalculado. Continuar?'
+        : 'Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.',
       confirmLabel: 'Excluir',
     });
     if (!ok) return;

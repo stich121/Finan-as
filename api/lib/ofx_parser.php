@@ -118,3 +118,121 @@ function ofx_parse_date(string $raw): ?string
     }
     return sprintf('%04d-%02d-%02d', $y, $mo, $d);
 }
+
+/**
+ * Parser de CSV bancário com detecção de separador e nomes de colunas comuns no Brasil.
+ * Colunas mínimas: data, descrição/histórico e valor (ou débito/crédito).
+ */
+function parse_bank_csv(string $raw): array
+{
+    $raw = strip_utf8_bom($raw);
+    if (@preg_match('//u', $raw) !== 1) {
+        $converted = @iconv('Windows-1252', 'UTF-8//IGNORE', $raw);
+        if ($converted !== false) {
+            $raw = $converted;
+        }
+    }
+    $lines = preg_split('/\r\n|\r|\n/', trim($raw)) ?: [];
+    if (count($lines) < 2) {
+        throw new RuntimeException('CSV vazio ou sem linhas de transação.');
+    }
+
+    $first = $lines[0];
+    $counts = [';' => substr_count($first, ';'), ',' => substr_count($first, ','), "\t" => substr_count($first, "\t")];
+    arsort($counts);
+    $delimiter = (string) array_key_first($counts);
+    $headers = array_map('csv_normalize_header', str_getcsv(array_shift($lines), $delimiter));
+
+    $find = static function (array $names) use ($headers): ?int {
+        foreach ($names as $name) {
+            $index = array_search($name, $headers, true);
+            if ($index !== false) {
+                return (int) $index;
+            }
+        }
+        return null;
+    };
+
+    $dateIndex = $find(['data', 'date', 'data_lancamento', 'data_movimento']);
+    $descriptionIndex = $find(['descricao', 'historico', 'description', 'lancamento', 'detalhes']);
+    $payeeIndex = $find(['beneficiario', 'favorecido', 'estabelecimento', 'payee']);
+    $amountIndex = $find(['valor', 'amount', 'valor_lancamento']);
+    $debitIndex = $find(['debito', 'valor_debito']);
+    $creditIndex = $find(['credito', 'valor_credito']);
+
+    if ($dateIndex === null || ($amountIndex === null && $debitIndex === null && $creditIndex === null)) {
+        throw new RuntimeException('CSV sem as colunas necessárias. Use Data + Valor (ou Débito/Crédito).');
+    }
+
+    $transactions = [];
+    foreach ($lines as $rowNumber => $line) {
+        if (trim($line) === '') {
+            continue;
+        }
+        $row = str_getcsv($line, $delimiter);
+        $date = csv_parse_date((string) ($row[$dateIndex] ?? ''));
+        if ($date === null) {
+            continue;
+        }
+        if ($amountIndex !== null) {
+            $amount = csv_parse_amount((string) ($row[$amountIndex] ?? ''));
+        } else {
+            $credit = $creditIndex !== null ? abs(csv_parse_amount((string) ($row[$creditIndex] ?? ''))) : 0.0;
+            $debit = $debitIndex !== null ? abs(csv_parse_amount((string) ($row[$debitIndex] ?? ''))) : 0.0;
+            $amount = $credit > 0 ? $credit : -$debit;
+        }
+        if (abs($amount) < 0.001) {
+            continue;
+        }
+        $description = trim((string) ($descriptionIndex !== null ? ($row[$descriptionIndex] ?? '') : ''));
+        $payee = trim((string) ($payeeIndex !== null ? ($row[$payeeIndex] ?? '') : ''));
+        $fingerprint = hash('sha256', $date . '|' . number_format($amount, 2, '.', '') . '|' . $description . '|' . $payee . '|' . $rowNumber);
+        $transactions[] = [
+            'fitId' => 'csv-' . substr($fingerprint, 0, 32),
+            'date' => $date,
+            'amount' => round($amount, 2),
+            'type' => $amount < 0 ? 'EXPENSE' : 'INCOME',
+            'description' => $description !== '' ? $description : ($payee !== '' ? $payee : 'Lançamento importado'),
+            'payee' => $payee !== '' ? $payee : null,
+            'memo' => null,
+        ];
+    }
+    return $transactions;
+}
+
+function csv_normalize_header(string $header): string
+{
+    $header = trim($header);
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $header);
+    $header = strtolower($ascii !== false ? $ascii : $header);
+    return trim(preg_replace('/[^a-z0-9]+/', '_', $header) ?? $header, '_');
+}
+
+function csv_parse_date(string $raw): ?string
+{
+    $raw = trim($raw);
+    foreach (['!d/m/Y', '!d-m-Y', '!Y-m-d', '!d/m/y'] as $format) {
+        $date = DateTime::createFromFormat($format, $raw);
+        if ($date && $date->format(str_replace('!', '', $format)) === $raw) {
+            return $date->format('Y-m-d');
+        }
+    }
+    return null;
+}
+
+function csv_parse_amount(string $raw): float
+{
+    $value = preg_replace('/[^\d,\.\-+]/', '', trim($raw)) ?? '';
+    if (str_contains($value, ',') && str_contains($value, '.')) {
+        if (strrpos($value, ',') > strrpos($value, '.')) {
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+        } else {
+            $value = str_replace(',', '', $value);
+        }
+    } elseif (str_contains($value, ',')) {
+        $value = str_replace('.', '', $value);
+        $value = str_replace(',', '.', $value);
+    }
+    return (float) $value;
+}

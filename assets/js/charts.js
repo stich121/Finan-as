@@ -101,6 +101,84 @@ export function drawCategoryBars(canvas, items) {
   });
 }
 
+const activeAnimations = new WeakMap();
+
+export function drawForecastChart(canvas, points) {
+  const previous = activeAnimations.get(canvas);
+  if (previous) cancelAnimationFrame(previous);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const startedAt = performance.now();
+
+  const frame = (now) => {
+    const progress = reduceMotion ? 1 : Math.min(1, (now - startedAt) / 700);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const { ctx, width, height } = setupCanvas(canvas);
+    ctx.clearRect(0, 0, width, height);
+    const padding = { top: 18, right: 16, bottom: 28, left: 16 };
+    const plotW = width - padding.left - padding.right;
+    const plotH = height - padding.top - padding.bottom;
+    const values = points.map((point) => point.cumulative);
+    const min = Math.min(0, ...values);
+    const max = Math.max(1, ...values);
+    const range = Math.max(1, max - min);
+    const xFor = (index) => padding.left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * plotW);
+    const yFor = (value) => padding.top + ((max - value) / range) * plotH;
+    const zeroY = yFor(0);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.10)';
+    ctx.beginPath();
+    ctx.moveTo(padding.left, zeroY);
+    ctx.lineTo(width - padding.right, zeroY);
+    ctx.stroke();
+
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, height);
+    gradient.addColorStop(0, 'rgba(56,189,248,.35)');
+    gradient.addColorStop(1, 'rgba(56,189,248,0)');
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      const visibleValue = index === 0
+        ? point.cumulative * eased
+        : points[index - 1].cumulative + (point.cumulative - points[index - 1].cumulative) * eased;
+      const x = xFor(index);
+      const y = yFor(visibleValue);
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    if (points.length) {
+      ctx.lineTo(xFor(points.length - 1), zeroY);
+      ctx.lineTo(xFor(0), zeroY);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      const x = xFor(index);
+      const y = yFor(point.cumulative * eased);
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    ctx.fillStyle = '#93a1c2';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    points.forEach((point, index) => {
+      const [year, month] = point.month.split('-');
+      ctx.fillText(`${month}/${year.slice(2)}`, xFor(index), height - 8);
+    });
+
+    if (progress < 1) {
+      activeAnimations.set(canvas, requestAnimationFrame(frame));
+    } else {
+      activeAnimations.delete(canvas);
+    }
+  };
+  activeAnimations.set(canvas, requestAnimationFrame(frame));
+}
+
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);

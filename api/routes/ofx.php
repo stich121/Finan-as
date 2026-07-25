@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/ofx_parser.php';
 require_once __DIR__ . '/../lib/matcher.php';
+require_once __DIR__ . '/../lib/finance.php';
 
 const OFX_STAGING_TTL_MINUTES = 30;
 const OFX_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -29,7 +30,7 @@ function handle_route(array $segments, string $method): void
 function ofx_preview(string $userId): void
 {
     if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-        error_response('Envie um arquivo OFX/QFX válido no campo "file".', 422);
+        error_response('Envie um arquivo OFX, QFX ou CSV válido no campo "file".', 422);
     }
     $accountId = (string) ($_POST['accountId'] ?? '');
     if ($accountId === '') {
@@ -52,7 +53,8 @@ function ofx_preview(string $userId): void
     }
 
     try {
-        $parsed = parse_ofx_file($raw);
+        $extension = strtolower(pathinfo((string) $_FILES['file']['name'], PATHINFO_EXTENSION));
+        $parsed = $extension === 'csv' ? parse_bank_csv($raw) : parse_ofx_file($raw);
     } catch (Throwable $e) {
         error_response('Erro ao interpretar o OFX: ' . $e->getMessage(), 422);
         return;
@@ -142,8 +144,8 @@ function ofx_confirm(string $userId): void
     }
 
     $insert = $pdo->prepare(
-        'INSERT IGNORE INTO transactions (id, user_id, account_id, category_id, type, amount, date, description, payee, memo, fit_id, source, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "OFX", ?, ?)'
+        'INSERT IGNORE INTO transactions (id, user_id, account_id, category_id, type, amount, date, description, payee, memo, fit_id, source, status, invoice_id, purchase_date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "OFX", "CLEARED", ?, ?, ?, ?)'
     );
 
     $pdo->beginTransaction();
@@ -160,6 +162,10 @@ function ofx_confirm(string $userId): void
             }
 
             $categoryId = $categoryOverrides[$rowId] ?? $tx['suggestedCategoryId'] ?? null;
+            $invoiceId = null;
+            if ($account['type'] === 'CREDIT_CARD' && $tx['type'] === 'EXPENSE') {
+                $invoiceId = ensure_card_invoice($pdo, $userId, $account, $tx['date'])['id'];
+            }
             $insert->execute([
                 uuid_v4(),
                 $userId,
@@ -172,6 +178,8 @@ function ofx_confirm(string $userId): void
                 $tx['payee'],
                 $tx['memo'],
                 $tx['fitId'],
+                $invoiceId,
+                $account['type'] === 'CREDIT_CARD' ? $tx['date'] : null,
                 now_datetime(),
                 now_datetime(),
             ]);

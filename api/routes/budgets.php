@@ -57,7 +57,7 @@ function budgets_find_out(string $userId, string $id): ?array
 
     $spentStmt = $pdo->prepare(
         "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE user_id = ? AND category_id = ? AND type = 'EXPENSE' AND DATE_FORMAT(date, '%Y-%m') = ?"
+         WHERE user_id = ? AND category_id = ? AND type = 'EXPENSE' AND status = 'CLEARED' AND DATE_FORMAT(date, '%Y-%m') = ?"
     );
     $spentStmt->execute([$userId, $b['category_id'], $b['month']]);
     $spent = abs((float) $spentStmt->fetchColumn());
@@ -91,7 +91,7 @@ function budgets_list(string $userId): void
 
     $spentStmt = $pdo->prepare(
         "SELECT category_id, SUM(amount) AS total FROM transactions
-         WHERE user_id = ? AND type = 'EXPENSE' AND DATE_FORMAT(date, '%Y-%m') = ?
+         WHERE user_id = ? AND type = 'EXPENSE' AND status = 'CLEARED' AND DATE_FORMAT(date, '%Y-%m') = ?
          GROUP BY category_id"
     );
     $spentStmt->execute([$userId, $month]);

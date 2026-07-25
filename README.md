@@ -1,7 +1,8 @@
 # Finanças
 
-App de finanças pessoais: contas, categorias, transações (incl. transferências), importação de
-extratos OFX com categorização automática por regras, orçamento mensal e transações recorrentes.
+App de finanças pessoais: contas, cartões e faturas, compras parceladas, categorias, transações
+(incl. transferências), importação de extratos OFX com categorização automática por regras,
+orçamento mensal, metas, recorrências, previsão de fluxo de caixa e relatórios exportáveis.
 
 Stack: **HTML/CSS/JavaScript puro** (MPA — cada tela é uma página `.php` real, navegação por link
 normal, sem framework/build step) no front-end e **PHP + MySQL** no back-end. Funciona como **PWA**
@@ -44,6 +45,31 @@ instalação PHP) e um MySQL/MariaDB local (ou XAMPP/Laragon/etc).
 
 4. Acesse `http://localhost:8080`. Crie uma conta pelo formulário de registro — categorias e regras
    padrão são criadas automaticamente.
+
+### Atualizando um banco que já existe
+
+Se o banco já possui as tabelas da versão anterior, não importe o schema completo novamente.
+No phpMyAdmin, selecione o banco e execute apenas:
+
+```
+sql/migration_2026_07_finance_complete.sql
+```
+
+Essa migração preserva usuários, contas e transações existentes e adiciona os campos de limite,
+fechamento, vencimento, faturas, parcelas e situação de conciliação.
+
+## Recursos principais
+
+- Contas correntes, poupança, dinheiro, investimentos e cartões de crédito
+- Faturas abertas, fechadas, pagas e atrasadas, com pagamentos parciais ou totais
+- Compras parceladas distribuídas automaticamente nas próximas faturas
+- Limite utilizado e disponível por cartão
+- Transações pendentes ou confirmadas, transferências e tags
+- OFX/QFX/CSV com pré-visualização, regras automáticas e proteção contra duplicados
+- Orçamento mensal, recorrências e metas financeiras
+- Dashboard com patrimônio líquido, dívidas, alertas e previsão de seis meses
+- Relatórios por período, categorias e beneficiários, com exportação CSV e backup JSON
+- Tema claro, escuro ou automático e instalação como PWA
 
 Não há build step: qualquer alteração nos arquivos é refletida direto no navegador (dê F5).
 

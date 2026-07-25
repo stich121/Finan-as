@@ -24,6 +24,9 @@ export async function render(root) {
 
   const linksCard = el(`
     <div class="card">
+      <a href="/accounts.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Contas e cartões</div><div class="subtitle">Saldos, limites e vencimentos</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/budgets.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Orçamentos</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/reports.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Relatórios e exportação</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
       <a href="/categories.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Categorias</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
       <a href="/tags.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Tags</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
       <a href="/rules.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Regras de categorização</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
@@ -43,10 +46,52 @@ export async function render(root) {
           <option value="dark" ${user.theme === 'dark' ? 'selected' : ''}>Escuro</option>
         </select>
       </div>
-      <p class="hint">Este app usa um tema escuro por padrão; a opção "claro" ainda não altera o layout.</p>
+      <p class="hint">A aparência acompanha sua preferência e pode ser alterada a qualquer momento.</p>
     </div>
   `);
   container.appendChild(themeCard);
+  themeCard.querySelector('#theme-select').addEventListener('change', async (event) => {
+    const theme = event.target.value;
+    try {
+      await api.patch('/auth/preferences', { theme });
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.resolvedTheme = theme === 'system'
+        ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        : theme;
+      toastSuccess('Tema atualizado.');
+    } catch (err) {
+      event.target.value = user.theme;
+    }
+  });
+
+  const notificationSupported = 'Notification' in window;
+  const notificationsEnabled = notificationSupported
+    && Notification.permission === 'granted'
+    && localStorage.getItem('finance-notifications') === 'enabled';
+  const notificationCard = el(`
+    <div class="card">
+      <h2>Alertas no dispositivo</h2>
+      <p class="hint">Receba um aviso ao abrir o app quando houver faturas atrasadas ou orçamentos no limite.</p>
+      <button class="btn secondary" id="notification-btn" ${notificationSupported ? '' : 'disabled'}>
+        ${notificationSupported ? (notificationsEnabled ? 'Desativar alertas' : 'Ativar alertas') : 'Não disponível neste navegador'}
+      </button>
+    </div>
+  `);
+  container.appendChild(notificationCard);
+  notificationCard.querySelector('#notification-btn').addEventListener('click', async (event) => {
+    if (localStorage.getItem('finance-notifications') === 'enabled') {
+      localStorage.removeItem('finance-notifications');
+      event.target.textContent = 'Ativar alertas';
+      toastSuccess('Alertas desativados neste dispositivo.');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      localStorage.setItem('finance-notifications', 'enabled');
+      event.target.textContent = 'Desativar alertas';
+      toastSuccess('Alertas ativados neste dispositivo.');
+    }
+  });
 
   const passwordCard = el(`
     <div class="card">
