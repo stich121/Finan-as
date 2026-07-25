@@ -10,9 +10,18 @@ function db(): PDO
     }
 
     $config = app_config();
+    $dbHost = trim((string) ($config['db_host'] ?? ''));
+    // Em hospedagens Linux, "localhost" faz o PDO tentar um socket Unix. Na
+    // Hostinger esse socket pode não existir no caminho padrão do PHP, causando
+    // SQLSTATE[HY000] [2002]. O IP força a conexão TCP com o MySQL local.
+    if ($dbHost === '' || strcasecmp($dbHost, 'localhost') === 0) {
+        $dbHost = '127.0.0.1';
+    }
+    $dbPort = max(1, (int) ($config['db_port'] ?? 3306));
     $dsn = sprintf(
-        'mysql:host=%s;dbname=%s;charset=utf8mb4',
-        $config['db_host'],
+        'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+        $dbHost,
+        $dbPort,
         $config['db_name']
     );
 
@@ -20,6 +29,7 @@ function db(): PDO
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::ATTR_TIMEOUT => 5,
     ]);
 
     return $pdo;
