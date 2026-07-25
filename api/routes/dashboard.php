@@ -36,8 +36,14 @@ function dashboard_summary(string $userId): void
     }
 
     $pdo = db();
+    $hasTransactionStatus = db_column_exists($pdo, 'transactions', 'status');
+    $hasInvoices = db_table_exists($pdo, 'credit_card_invoices')
+        && db_column_exists($pdo, 'transactions', 'invoice_id');
+    $clearedFilter = $hasTransactionStatus ? " AND status = 'CLEARED'" : '';
 
-    refresh_invoice_statuses($pdo, $userId);
+    if ($hasInvoices) {
+        refresh_invoice_statuses($pdo, $userId);
+    }
 
     $balanceStmt = $pdo->prepare("SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE user_id = ? AND archived = 0 AND type <> 'CREDIT_CARD'");
     $balanceStmt->execute([$userId]);
@@ -49,13 +55,15 @@ function dashboard_summary(string $userId): void
     $netWorth = round($availableBalance - $creditCardDebt, 2);
 
     $incomeStmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type = 'INCOME' AND status = 'CLEARED' AND DATE_FORMAT(date, '%Y-%m') = ?"
+        "SELECT COALESCE(SUM(amount), 0) FROM transactions
+         WHERE user_id = ? AND type = 'INCOME'{$clearedFilter} AND DATE_FORMAT(date, '%Y-%m') = ?"
     );
     $incomeStmt->execute([$userId, $month]);
     $income = (float) $incomeStmt->fetchColumn();
 
     $expenseStmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE user_id = ? AND type = 'EXPENSE' AND status = 'CLEARED' AND DATE_FORMAT(date, '%Y-%m') = ?"
+        "SELECT COALESCE(SUM(amount), 0) FROM transactions
+         WHERE user_id = ? AND type = 'EXPENSE'{$clearedFilter} AND DATE_FORMAT(date, '%Y-%m') = ?"
     );
     $expenseStmt->execute([$userId, $month]);
     $expense = abs((float) $expenseStmt->fetchColumn());
@@ -63,7 +71,9 @@ function dashboard_summary(string $userId): void
     $byCategoryStmt = $pdo->prepare(
         "SELECT c.id, c.name, c.color, SUM(t.amount) AS total FROM transactions t
          JOIN categories c ON c.id = t.category_id
-         WHERE t.user_id = ? AND t.type = 'EXPENSE' AND t.status = 'CLEARED' AND DATE_FORMAT(t.date, '%Y-%m') = ?
+         WHERE t.user_id = ? AND t.type = 'EXPENSE'"
+         . ($hasTransactionStatus ? " AND t.status = 'CLEARED'" : '') .
+         " AND DATE_FORMAT(t.date, '%Y-%m') = ?
          GROUP BY c.id, c.name, c.color ORDER BY total ASC"
     );
     $byCategoryStmt->execute([$userId, $month]);
@@ -78,32 +88,35 @@ function dashboard_summary(string $userId): void
 
     $uncategorizedStmt = $pdo->prepare(
         "SELECT COUNT(*) FROM transactions
-         WHERE user_id = ? AND type = 'EXPENSE' AND status = 'CLEARED' AND category_id IS NULL AND DATE_FORMAT(date, '%Y-%m') = ?"
+         WHERE user_id = ? AND type = 'EXPENSE'{$clearedFilter}
+           AND category_id IS NULL AND DATE_FORMAT(date, '%Y-%m') = ?"
     );
     $uncategorizedStmt->execute([$userId, $month]);
     $uncategorized = (int) $uncategorizedStmt->fetchColumn();
 
     $alerts = [];
-    $invoiceStmt = $pdo->prepare(
-        "SELECT i.*, a.name account_name,
-           COALESCE(ABS(SUM(t.amount)), 0) total
-         FROM credit_card_invoices i
-         JOIN accounts a ON a.id = i.account_id
-         LEFT JOIN transactions t ON t.invoice_id = i.id AND t.type = 'EXPENSE'
-         WHERE i.user_id = ? AND i.status IN ('CLOSED','OVERDUE')
-         GROUP BY i.id, a.name ORDER BY i.due_date ASC LIMIT 5"
-    );
-    $invoiceStmt->execute([$userId]);
-    foreach ($invoiceStmt->fetchAll() as $invoice) {
-        $remaining = max(0, (float) $invoice['total'] - (float) $invoice['paid_amount']);
-        if ($remaining > 0) {
-            $alerts[] = [
-                'kind' => $invoice['status'] === 'OVERDUE' ? 'danger' : 'warning',
-                'title' => $invoice['status'] === 'OVERDUE' ? 'Fatura atrasada' : 'Fatura fechada',
-                'message' => $invoice['account_name'] . ' · vence em ' . (new DateTime($invoice['due_date']))->format('d/m/Y'),
-                'amount' => $remaining,
-                'href' => '/cards.php',
-            ];
+    if ($hasInvoices) {
+        $invoiceStmt = $pdo->prepare(
+            "SELECT i.*, a.name account_name,
+               COALESCE(ABS(SUM(t.amount)), 0) total
+             FROM credit_card_invoices i
+             JOIN accounts a ON a.id = i.account_id
+             LEFT JOIN transactions t ON t.invoice_id = i.id AND t.type = 'EXPENSE'
+             WHERE i.user_id = ? AND i.status IN ('CLOSED','OVERDUE')
+             GROUP BY i.id, a.name ORDER BY i.due_date ASC LIMIT 5"
+        );
+        $invoiceStmt->execute([$userId]);
+        foreach ($invoiceStmt->fetchAll() as $invoice) {
+            $remaining = max(0, (float) $invoice['total'] - (float) $invoice['paid_amount']);
+            if ($remaining > 0) {
+                $alerts[] = [
+                    'kind' => $invoice['status'] === 'OVERDUE' ? 'danger' : 'warning',
+                    'title' => $invoice['status'] === 'OVERDUE' ? 'Fatura atrasada' : 'Fatura fechada',
+                    'message' => $invoice['account_name'] . ' · vence em ' . (new DateTime($invoice['due_date']))->format('d/m/Y'),
+                    'amount' => $remaining,
+                    'href' => '/cards.php',
+                ];
+            }
         }
     }
 
@@ -111,7 +124,9 @@ function dashboard_summary(string $userId): void
         "SELECT c.name, b.amount budget_amount, ABS(COALESCE(SUM(t.amount), 0)) spent
          FROM budgets b JOIN categories c ON c.id = b.category_id
          LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
-           AND t.type = 'EXPENSE' AND t.status = 'CLEARED' AND DATE_FORMAT(t.date, '%Y-%m') = b.month
+           AND t.type = 'EXPENSE'"
+         . ($hasTransactionStatus ? " AND t.status = 'CLEARED'" : '') .
+         " AND DATE_FORMAT(t.date, '%Y-%m') = b.month
          WHERE b.user_id = ? AND b.month = ?
          GROUP BY b.id, c.name, b.amount
          HAVING spent >= b.amount * 0.8 ORDER BY spent / b.amount DESC LIMIT 5"
@@ -209,6 +224,9 @@ function dashboard_trend(string $userId): void
 {
     $months = max(1, min(24, (int) ($_GET['months'] ?? 6)));
     $pdo = db();
+    $clearedFilter = db_column_exists($pdo, 'transactions', 'status')
+        ? " AND status = 'CLEARED'"
+        : '';
 
     $result = [];
     $cursor = new DateTime('first day of this month');
@@ -221,7 +239,7 @@ function dashboard_trend(string $userId): void
 
     $stmt = $pdo->prepare(
         "SELECT DATE_FORMAT(date, '%Y-%m') AS ym, type, SUM(amount) AS total FROM transactions
-         WHERE user_id = ? AND type IN ('INCOME','EXPENSE') AND status = 'CLEARED' AND date >= ?
+         WHERE user_id = ? AND type IN ('INCOME','EXPENSE'){$clearedFilter} AND date >= ?
          GROUP BY ym, type"
     );
     $startDate = (clone $cursor)->modify('-' . ($months - 1) . ' months')->format('Y-m-01');
