@@ -48,37 +48,31 @@ function dashboard_summary(string $userId): void
         && db_column_exists($pdo, 'transactions', 'invoice_id');
     $clearedFilter = $hasTransactionStatus ? " AND status = 'CLEARED'" : '';
 
-    if ($hasInvoices) {
-        try {
-            refresh_invoice_statuses($pdo, $userId);
-        } catch (Throwable $e) {
-            error_log('[financas-dashboard] Falha ao atualizar faturas: ' . $e->getMessage());
-            $hasInvoices = false;
-        }
-    }
-
-    $balanceStmt = $pdo->prepare("SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE user_id = ? AND archived = 0 AND type <> 'CREDIT_CARD'");
+    // Uma única leitura substitui duas consultas. O dashboard não deve atualizar
+    // faturas: escritas no carregamento criavam locks e picos de latência no MySQL.
+    $balanceStmt = $pdo->prepare(
+        "SELECT
+           COALESCE(SUM(CASE WHEN type <> 'CREDIT_CARD' THEN balance ELSE 0 END), 0) available_balance,
+           COALESCE(SUM(CASE WHEN type = 'CREDIT_CARD' AND balance < 0 THEN ABS(balance) ELSE 0 END), 0) credit_card_debt
+         FROM accounts WHERE user_id = ? AND archived = 0"
+    );
     $balanceStmt->execute([$userId]);
-    $availableBalance = (float) $balanceStmt->fetchColumn();
-
-    $debtStmt = $pdo->prepare("SELECT COALESCE(ABS(SUM(LEAST(balance, 0))), 0) FROM accounts WHERE user_id = ? AND archived = 0 AND type = 'CREDIT_CARD'");
-    $debtStmt->execute([$userId]);
-    $creditCardDebt = (float) $debtStmt->fetchColumn();
+    $balances = $balanceStmt->fetch() ?: [];
+    $availableBalance = (float) ($balances['available_balance'] ?? 0);
+    $creditCardDebt = (float) ($balances['credit_card_debt'] ?? 0);
     $netWorth = round($availableBalance - $creditCardDebt, 2);
 
-    $incomeStmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE user_id = ? AND type = 'INCOME'{$clearedFilter} AND date >= ? AND date < ?"
+    $cashFlowStmt = $pdo->prepare(
+        "SELECT
+           COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) income,
+           COALESCE(ABS(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END)), 0) expense
+         FROM transactions
+         WHERE user_id = ? AND type IN ('INCOME','EXPENSE'){$clearedFilter} AND date >= ? AND date < ?"
     );
-    $incomeStmt->execute([$userId, $monthStartSql, $monthEndSql]);
-    $income = (float) $incomeStmt->fetchColumn();
-
-    $expenseStmt = $pdo->prepare(
-        "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE user_id = ? AND type = 'EXPENSE'{$clearedFilter} AND date >= ? AND date < ?"
-    );
-    $expenseStmt->execute([$userId, $monthStartSql, $monthEndSql]);
-    $expense = abs((float) $expenseStmt->fetchColumn());
+    $cashFlowStmt->execute([$userId, $monthStartSql, $monthEndSql]);
+    $cashFlow = $cashFlowStmt->fetch() ?: [];
+    $income = (float) ($cashFlow['income'] ?? 0);
+    $expense = (float) ($cashFlow['expense'] ?? 0);
 
     $byCategoryStmt = $pdo->prepare(
         "SELECT c.id, c.name, c.color, SUM(t.amount) AS total FROM transactions t
@@ -116,16 +110,17 @@ function dashboard_summary(string $userId): void
                     WHERE t.invoice_id = i.id AND t.type = 'EXPENSE') total
                  FROM credit_card_invoices i
                  JOIN accounts a ON a.id = i.account_id
-                 WHERE i.user_id = ? AND i.status IN ('CLOSED','OVERDUE')
+                 WHERE i.user_id = ? AND i.status <> 'PAID' AND i.closing_date < CURRENT_DATE
                  ORDER BY i.due_date ASC LIMIT 5"
             );
             $invoiceStmt->execute([$userId]);
             foreach ($invoiceStmt->fetchAll() as $invoice) {
                 $remaining = max(0, (float) $invoice['total'] - (float) $invoice['paid_amount']);
                 if ($remaining > 0) {
+                    $isOverdue = $invoice['due_date'] < (new DateTime('today'))->format('Y-m-d');
                     $alerts[] = [
-                        'kind' => $invoice['status'] === 'OVERDUE' ? 'danger' : 'warning',
-                        'title' => $invoice['status'] === 'OVERDUE' ? 'Fatura atrasada' : 'Fatura fechada',
+                        'kind' => $isOverdue ? 'danger' : 'warning',
+                        'title' => $isOverdue ? 'Fatura atrasada' : 'Fatura fechada',
                         'message' => $invoice['account_name'] . ' · vence em ' . (new DateTime($invoice['due_date']))->format('d/m/Y'),
                         'amount' => $remaining,
                         'href' => '/cards.php',
