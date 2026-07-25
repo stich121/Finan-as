@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'financas-v5';
+const CACHE_VERSION = 'financas-v6';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Só pré-cacheamos assets estáticos (CSS/JS/ícones). As páginas .php são renderizadas
@@ -72,6 +72,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (request.destination === 'style' || request.destination === 'script') {
+    event.respondWith(staticNetworkFirst(request));
+    return;
+  }
+
   event.respondWith(cacheFirst(request));
 });
 
@@ -83,6 +88,18 @@ async function apiNetworkOnly(request) {
       status: 503,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+}
+
+async function staticNetworkFirst(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  try {
+    const response = await fetch(request, { cache: 'no-cache' });
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch {
+    const cached = await cache.match(request) || await cache.match(request, { ignoreSearch: true });
+    return cached || new Response('Offline', { status: 503 });
   }
 }
 

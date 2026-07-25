@@ -48,6 +48,7 @@ $navItems = [
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
+$assetVersion = '20260725.6';
 $userInitial = '?';
 if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $initialMatch)) {
     $userInitial = strtoupper($initialMatch[0]);
@@ -61,13 +62,13 @@ if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $in
   <title><?= h($pageTitle ?? 'Finanças') ?> · Finanças</title>
   <meta name="description" content="Controle financeiro pessoal: contas, categorias, orçamento e importação de extratos OFX." />
   <meta name="theme-color" content="#08101f" />
-  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="manifest" href="/manifest.webmanifest?v=<?= h($assetVersion) ?>" />
   <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Finanças" />
-  <link rel="stylesheet" href="/assets/css/styles.css" />
+  <link rel="stylesheet" href="/assets/css/styles.css?v=<?= h($assetVersion) ?>" />
   <script>
     (() => {
       const pref = document.documentElement.dataset.theme;
