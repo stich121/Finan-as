@@ -3,7 +3,9 @@
 // do banco criado no hPanel da Hostinger. NÃO versionar config.php (está no .gitignore).
 
 return [
-    'db_host' => 'localhost',
+    // Use 127.0.0.1 para forçar TCP e evitar erro de socket Unix na Hostinger.
+    'db_host' => '127.0.0.1',
+    'db_port' => 3306,
     'db_name' => 'u000000000_financas',
     'db_user' => 'u000000000_financas',
     'db_pass' => 'troque-esta-senha',
