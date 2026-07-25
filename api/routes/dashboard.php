@@ -42,7 +42,12 @@ function dashboard_summary(string $userId): void
     $clearedFilter = $hasTransactionStatus ? " AND status = 'CLEARED'" : '';
 
     if ($hasInvoices) {
-        refresh_invoice_statuses($pdo, $userId);
+        try {
+            refresh_invoice_statuses($pdo, $userId);
+        } catch (Throwable $e) {
+            error_log('[financas-dashboard] Falha ao atualizar faturas: ' . $e->getMessage());
+            $hasInvoices = false;
+        }
     }
 
     $balanceStmt = $pdo->prepare("SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE user_id = ? AND archived = 0 AND type <> 'CREDIT_CARD'");
@@ -96,53 +101,62 @@ function dashboard_summary(string $userId): void
 
     $alerts = [];
     if ($hasInvoices) {
-        $invoiceStmt = $pdo->prepare(
-            "SELECT i.*, a.name account_name,
-               COALESCE(ABS(SUM(t.amount)), 0) total
-             FROM credit_card_invoices i
-             JOIN accounts a ON a.id = i.account_id
-             LEFT JOIN transactions t ON t.invoice_id = i.id AND t.type = 'EXPENSE'
-             WHERE i.user_id = ? AND i.status IN ('CLOSED','OVERDUE')
-             GROUP BY i.id, a.name ORDER BY i.due_date ASC LIMIT 5"
-        );
-        $invoiceStmt->execute([$userId]);
-        foreach ($invoiceStmt->fetchAll() as $invoice) {
-            $remaining = max(0, (float) $invoice['total'] - (float) $invoice['paid_amount']);
-            if ($remaining > 0) {
-                $alerts[] = [
-                    'kind' => $invoice['status'] === 'OVERDUE' ? 'danger' : 'warning',
-                    'title' => $invoice['status'] === 'OVERDUE' ? 'Fatura atrasada' : 'Fatura fechada',
-                    'message' => $invoice['account_name'] . ' · vence em ' . (new DateTime($invoice['due_date']))->format('d/m/Y'),
-                    'amount' => $remaining,
-                    'href' => '/cards.php',
-                ];
+        try {
+            $invoiceStmt = $pdo->prepare(
+                "SELECT i.*, a.name account_name,
+                   (SELECT COALESCE(ABS(SUM(t.amount)), 0)
+                    FROM transactions t
+                    WHERE t.invoice_id = i.id AND t.type = 'EXPENSE') total
+                 FROM credit_card_invoices i
+                 JOIN accounts a ON a.id = i.account_id
+                 WHERE i.user_id = ? AND i.status IN ('CLOSED','OVERDUE')
+                 ORDER BY i.due_date ASC LIMIT 5"
+            );
+            $invoiceStmt->execute([$userId]);
+            foreach ($invoiceStmt->fetchAll() as $invoice) {
+                $remaining = max(0, (float) $invoice['total'] - (float) $invoice['paid_amount']);
+                if ($remaining > 0) {
+                    $alerts[] = [
+                        'kind' => $invoice['status'] === 'OVERDUE' ? 'danger' : 'warning',
+                        'title' => $invoice['status'] === 'OVERDUE' ? 'Fatura atrasada' : 'Fatura fechada',
+                        'message' => $invoice['account_name'] . ' · vence em ' . (new DateTime($invoice['due_date']))->format('d/m/Y'),
+                        'amount' => $remaining,
+                        'href' => '/cards.php',
+                    ];
+                }
             }
+        } catch (Throwable $e) {
+            error_log('[financas-dashboard] Falha ao carregar alertas de fatura: ' . $e->getMessage());
         }
     }
 
-    $budgetStmt = $pdo->prepare(
-        "SELECT c.name, b.amount budget_amount, ABS(COALESCE(SUM(t.amount), 0)) spent
-         FROM budgets b JOIN categories c ON c.id = b.category_id
-         LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
-           AND t.type = 'EXPENSE'"
-         . ($hasTransactionStatus ? " AND t.status = 'CLEARED'" : '') .
-         " AND DATE_FORMAT(t.date, '%Y-%m') = b.month
-         WHERE b.user_id = ? AND b.month = ?
-         GROUP BY b.id, c.name, b.amount
-         HAVING spent >= b.amount * 0.8 ORDER BY spent / b.amount DESC LIMIT 5"
-    );
-    $budgetStmt->execute([$userId, $month]);
-    foreach ($budgetStmt->fetchAll() as $budget) {
-        $percent = (float) $budget['budget_amount'] > 0
-            ? round(((float) $budget['spent'] / (float) $budget['budget_amount']) * 100)
-            : 0;
-        $alerts[] = [
-            'kind' => $percent >= 100 ? 'danger' : 'warning',
-            'title' => $percent >= 100 ? 'Orçamento ultrapassado' : 'Atenção ao orçamento',
-            'message' => $budget['name'] . ' · ' . $percent . '% utilizado',
-            'amount' => (float) $budget['spent'],
-            'href' => '/budgets.php',
-        ];
+    try {
+        $budgetStmt = $pdo->prepare(
+            "SELECT c.name, b.amount budget_amount, ABS(COALESCE(SUM(t.amount), 0)) spent
+             FROM budgets b JOIN categories c ON c.id = b.category_id
+             LEFT JOIN transactions t ON t.category_id = b.category_id AND t.user_id = b.user_id
+               AND t.type = 'EXPENSE'"
+             . ($hasTransactionStatus ? " AND t.status = 'CLEARED'" : '') .
+             " AND DATE_FORMAT(t.date, '%Y-%m') = b.month
+             WHERE b.user_id = ? AND b.month = ?
+             GROUP BY b.id, c.name, b.amount
+             HAVING spent >= b.amount * 0.8 ORDER BY spent / NULLIF(b.amount, 0) DESC LIMIT 5"
+        );
+        $budgetStmt->execute([$userId, $month]);
+        foreach ($budgetStmt->fetchAll() as $budget) {
+            $percent = (float) $budget['budget_amount'] > 0
+                ? round(((float) $budget['spent'] / (float) $budget['budget_amount']) * 100)
+                : 0;
+            $alerts[] = [
+                'kind' => $percent >= 100 ? 'danger' : 'warning',
+                'title' => $percent >= 100 ? 'Orçamento ultrapassado' : 'Atenção ao orçamento',
+                'message' => $budget['name'] . ' · ' . $percent . '% utilizado',
+                'amount' => (float) $budget['spent'],
+                'href' => '/budgets.php',
+            ];
+        }
+    } catch (Throwable $e) {
+        error_log('[financas-dashboard] Falha ao carregar alertas de orçamento: ' . $e->getMessage());
     }
 
     json_response([
@@ -181,13 +195,20 @@ function dashboard_forecast(string $userId): void
         $known[$row['month']] = (float) $row['net'];
     }
 
-    $recurringStmt = $pdo->prepare(
-        "SELECT type, amount, frequency, next_run_date, end_date
-         FROM recurring_transactions
-         WHERE user_id = ? AND next_run_date <= ? AND (end_date IS NULL OR end_date >= ?)"
-    );
-    $recurringStmt->execute([$userId, $end->format('Y-m-d'), $today->format('Y-m-d')]);
-    $recurring = $recurringStmt->fetchAll();
+    $recurring = [];
+    if (db_table_exists($pdo, 'recurring_transactions')) {
+        try {
+            $recurringStmt = $pdo->prepare(
+                "SELECT type, amount, frequency, next_run_date, end_date
+                 FROM recurring_transactions
+                 WHERE user_id = ? AND next_run_date <= ? AND (end_date IS NULL OR end_date >= ?)"
+            );
+            $recurringStmt->execute([$userId, $end->format('Y-m-d'), $today->format('Y-m-d')]);
+            $recurring = $recurringStmt->fetchAll();
+        } catch (Throwable $e) {
+            error_log('[financas-dashboard] Falha ao carregar recorrências: ' . $e->getMessage());
+        }
+    }
     $recurringByMonth = [];
     foreach ($recurring as $item) {
         $cursor = new DateTime($item['next_run_date']);
