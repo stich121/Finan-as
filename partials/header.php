@@ -48,6 +48,10 @@ $navItems = [
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
+$userInitial = '?';
+if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $initialMatch)) {
+    $userInitial = strtoupper($initialMatch[0]);
+}
 ?>
 <!doctype html>
 <html lang="pt-BR" data-theme="<?= h($currentUser['theme'] ?? 'system') ?>">
@@ -56,7 +60,7 @@ $navItems = [
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title><?= h($pageTitle ?? 'Finanças') ?> · Finanças</title>
   <meta name="description" content="Controle financeiro pessoal: contas, categorias, orçamento e importação de extratos OFX." />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#08101f" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
@@ -92,14 +96,33 @@ $navItems = [
   <div id="app">
     <?php if ($currentUser): ?>
     <nav class="bottom-nav">
-      <?php foreach ($navItems as $item): ?>
-      <a href="<?= h($item['href']) ?>" class="<?= ($activeNav ?? '') === $item['key'] ? 'active' : '' ?>">
-        <span class="nav-icon"><?= icon_svg($item['icon'], 22) ?></span><span><?= h($item['label']) ?></span>
+      <a class="nav-brand" href="/index.php" aria-label="Finanças · Início">
+        <span class="nav-brand-mark"><?= icon_svg('wallet', 25) ?></span>
+        <span><strong>Finanças</strong><small>Seu dinheiro, claro.</small></span>
       </a>
-      <?php endforeach; ?>
+      <div class="nav-links">
+        <?php foreach ($navItems as $item): ?>
+        <a href="<?= h($item['href']) ?>" class="<?= ($activeNav ?? '') === $item['key'] ? 'active' : '' ?>">
+          <span class="nav-icon"><?= icon_svg($item['icon'], 22) ?></span><span><?= h($item['label']) ?></span>
+        </a>
+        <?php endforeach; ?>
+      </div>
+      <div class="nav-profile">
+        <span class="user-avatar"><?= h($userInitial) ?></span>
+        <span><strong><?= h($currentUser['name']) ?></strong><small><?= h($currentUser['email']) ?></small></span>
+      </div>
     </nav>
     <div class="app-content">
-      <header class="app-header"><h1><?= h($pageTitle ?? 'Finanças') ?></h1></header>
+      <header class="app-header">
+        <div class="header-copy">
+          <span class="header-kicker">Visão financeira</span>
+          <h1><?= h($pageTitle ?? 'Finanças') ?></h1>
+        </div>
+        <a href="/settings.php" class="header-user" aria-label="Abrir perfil e ajustes">
+          <span class="user-avatar"><?= h($userInitial) ?></span>
+          <span class="header-user-copy"><small>Olá,</small><strong><?= h(explode(' ', trim($currentUser['name']))[0]) ?></strong></span>
+        </a>
+      </header>
       <main class="app-main" id="view">
     <?php else: ?>
       <main class="app-main" id="view" style="padding:0;">
