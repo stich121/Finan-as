@@ -13,7 +13,7 @@ class ApiError extends Error {
 async function request(method, path, { body, isForm = false } = {}) {
   const headers = {};
   if (!isForm) headers['Content-Type'] = 'application/json';
-  const csrfToken = getState().csrfToken;
+  const csrfToken = getState().csrfToken || window.__APP_STATE__?.csrfToken;
   if (csrfToken && method !== 'GET') headers['X-CSRF-Token'] = csrfToken;
 
   const res = await fetch(BASE + path, {

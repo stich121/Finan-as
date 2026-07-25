@@ -55,6 +55,11 @@ function logout_user(): void
 
 function current_csrf_token(): ?string
 {
+    // Sessões criadas antes da adoção do CSRF não possuem o token. Gerá-lo
+    // preguiçosamente mantém essas sessões válidas sem exigir novo login.
+    if (!isset($_SESSION['csrf_token']) && current_user_id()) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
     return $_SESSION['csrf_token'] ?? null;
 }
 

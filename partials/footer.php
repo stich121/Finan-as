@@ -14,8 +14,6 @@ declare(strict_types=1);
   <?php if (!empty($entryScript)): ?>
   <script type="module">
     import { render } from '<?= h($entryScript . '?v=' . $assetVersion) ?>';
-    import { setState } from '/assets/js/state.js?v=<?= h($assetVersion) ?>';
-    if (window.__APP_STATE__) setState(window.__APP_STATE__);
     render(document.getElementById('view'), <?= json_encode($entryScriptArgs ?? [], JSON_UNESCAPED_UNICODE) ?>);
   </script>
   <?php endif; ?>
