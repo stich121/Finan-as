@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'financas-v10';
+const CACHE_VERSION = 'financas-v11';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Só pré-cacheamos assets estáticos (CSS/JS/ícones). As páginas .php são renderizadas
@@ -7,30 +7,6 @@ const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PRECACHE_URLS = [
   '/manifest.webmanifest',
   '/assets/css/styles.css',
-  '/assets/js/api.js',
-  '/assets/js/state.js',
-  '/assets/js/utils.js',
-  '/assets/js/charts.js',
-  '/assets/js/icons.js',
-  '/assets/js/components/modal.js',
-  '/assets/js/components/confirm-dialog.js',
-  '/assets/js/components/toast.js',
-  '/assets/js/pages/login.js',
-  '/assets/js/pages/register.js',
-  '/assets/js/pages/dashboard.js',
-  '/assets/js/pages/accounts.js',
-  '/assets/js/pages/cards.js',
-  '/assets/js/pages/categories.js',
-  '/assets/js/pages/tags.js',
-  '/assets/js/pages/goals.js',
-  '/assets/js/pages/transactions.js',
-  '/assets/js/pages/transaction-form.js',
-  '/assets/js/pages/ofx-import.js',
-  '/assets/js/pages/rules.js',
-  '/assets/js/pages/budgets.js',
-  '/assets/js/pages/recurring.js',
-  '/assets/js/pages/settings.js',
-  '/assets/js/pages/reports.js',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
@@ -72,7 +48,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (request.destination === 'style' || request.destination === 'script') {
+  // Módulos ES precisam ser entregues pela mesma versão. Não os armazenamos no
+  // service worker para evitar que um entrypoint novo importe dependências antigas.
+  if (request.destination === 'script') {
+    event.respondWith(apiNetworkOnly(request));
+    return;
+  }
+
+  if (request.destination === 'style') {
     event.respondWith(staticNetworkFirst(request));
     return;
   }

@@ -12,8 +12,23 @@ declare(strict_types=1);
   </div><!-- #app -->
   <div id="toast-root"></div>
   <?php if (!empty($entryScript)): ?>
+  <script>
+    window.__FINANCAS_ASSETS_READY__ = (async () => {
+      const repairKey = 'financas-assets-ready-<?= h($assetVersion) ?>';
+      if (sessionStorage.getItem(repairKey)) return;
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter((key) => key.startsWith('financas-')).map((key) => caches.delete(key)));
+        }
+      } finally {
+        sessionStorage.setItem(repairKey, '1');
+      }
+    })();
+  </script>
   <script type="module">
-    import { render } from '<?= h($entryScript . '?v=' . $assetVersion) ?>';
+    await window.__FINANCAS_ASSETS_READY__;
+    const { render } = await import('<?= h($entryScript . '?v=' . $assetVersion) ?>');
     render(document.getElementById('view'), <?= json_encode($entryScriptArgs ?? [], JSON_UNESCAPED_UNICODE) ?>);
   </script>
   <?php endif; ?>
