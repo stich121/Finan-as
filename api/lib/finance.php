@@ -32,7 +32,7 @@ function card_invoice_dates(array $card, string $purchaseDate): array
 function ensure_card_invoice(PDO $pdo, string $userId, array $card, string $purchaseDate): array
 {
     $dates = card_invoice_dates($card, $purchaseDate);
-    $stmt = $pdo->prepare('SELECT * FROM credit_card_invoices WHERE account_id = ? AND cycle_month = ?');
+    $stmt = $pdo->prepare('SELECT * FROM credit_card_invoices WHERE account_id = ? AND BINARY cycle_month = BINARY ?');
     $stmt->execute([$card['id'], $dates['cycleMonth']]);
     $invoice = $stmt->fetch();
     if ($invoice) {
