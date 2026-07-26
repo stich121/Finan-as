@@ -48,7 +48,22 @@ $navItems = [
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
-$assetVersion = '20260725.11';
+$assetVersion = '20260725.12';
+$versionedModules = [
+    '/assets/js/api.js',
+    '/assets/js/state.js',
+    '/assets/js/utils.js',
+    '/assets/js/charts.js',
+    '/assets/js/icons.js',
+    '/assets/js/components/modal.js',
+    '/assets/js/components/confirm-dialog.js',
+    '/assets/js/components/toast.js',
+    '/assets/js/pages/transaction-form.js',
+];
+$moduleImports = [];
+foreach ($versionedModules as $modulePath) {
+    $moduleImports[$modulePath] = $modulePath . '?v=' . $assetVersion;
+}
 $userInitial = '?';
 if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $initialMatch)) {
     $userInitial = strtoupper($initialMatch[0]);
@@ -78,6 +93,10 @@ if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $in
       document.documentElement.dataset.resolvedTheme = resolved;
     })();
   </script>
+  <script type="importmap"><?= json_encode(
+      ['imports' => $moduleImports],
+      JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+  ) ?></script>
   <?php if ($currentUser): ?>
   <script>
     window.__APP_STATE__ = <?= json_encode([
