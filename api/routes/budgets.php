@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+function budget_month_bounds(string $month): array
+{
+    $start = DateTime::createFromFormat('!Y-m', $month);
+    if (!$start) {
+        throw new InvalidArgumentException('Mês inválido.');
+    }
+    return [$start->format('Y-m-d'), (clone $start)->modify('+1 month')->format('Y-m-d')];
+}
+
 function handle_route(array $segments, string $method): void
 {
     $userId = require_login();
@@ -55,11 +64,14 @@ function budgets_find_out(string $userId, string $id): ?array
         return null;
     }
 
+    [$monthStart, $monthEnd] = budget_month_bounds((string) $b['month']);
+    $statusFilter = db_column_exists($pdo, 'transactions', 'status') ? " AND status = 'CLEARED'" : '';
     $spentStmt = $pdo->prepare(
         "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE user_id = ? AND category_id = ? AND type = 'EXPENSE' AND status = 'CLEARED' AND DATE_FORMAT(date, '%Y-%m') = ?"
+         WHERE user_id = ? AND category_id = ? AND type = 'EXPENSE'{$statusFilter}
+           AND date >= ? AND date < ?"
     );
-    $spentStmt->execute([$userId, $b['category_id'], $b['month']]);
+    $spentStmt->execute([$userId, $b['category_id'], $monthStart, $monthEnd]);
     $spent = abs((float) $spentStmt->fetchColumn());
 
     return [
@@ -81,20 +93,22 @@ function budgets_list(string $userId): void
     }
 
     $pdo = db();
+    [$monthStart, $monthEnd] = budget_month_bounds($month);
     $stmt = $pdo->prepare(
         'SELECT b.*, c.name AS category_name, c.color AS category_color
          FROM budgets b JOIN categories c ON c.id = b.category_id
-         WHERE b.user_id = ? AND b.month = ? ORDER BY c.name ASC'
+         WHERE b.user_id = ? AND BINARY b.month = BINARY ? ORDER BY c.name ASC'
     );
     $stmt->execute([$userId, $month]);
     $budgets = $stmt->fetchAll();
 
+    $statusFilter = db_column_exists($pdo, 'transactions', 'status') ? " AND status = 'CLEARED'" : '';
     $spentStmt = $pdo->prepare(
         "SELECT category_id, SUM(amount) AS total FROM transactions
-         WHERE user_id = ? AND type = 'EXPENSE' AND status = 'CLEARED' AND DATE_FORMAT(date, '%Y-%m') = ?
+         WHERE user_id = ? AND type = 'EXPENSE'{$statusFilter} AND date >= ? AND date < ?
          GROUP BY category_id"
     );
-    $spentStmt->execute([$userId, $month]);
+    $spentStmt->execute([$userId, $monthStart, $monthEnd]);
     $spentByCategory = [];
     foreach ($spentStmt->fetchAll() as $row) {
         $spentByCategory[$row['category_id']] = abs((float) $row['total']);
@@ -123,7 +137,7 @@ function budgets_upsert(string $userId): void
     $amount = decimal_amount($data['amount']);
 
     $pdo = db();
-    $stmt = $pdo->prepare('SELECT id FROM budgets WHERE user_id = ? AND category_id = ? AND month = ?');
+    $stmt = $pdo->prepare('SELECT id FROM budgets WHERE user_id = ? AND category_id = ? AND BINARY month = BINARY ?');
     $stmt->execute([$userId, $data['categoryId'], $data['month']]);
     $existing = $stmt->fetch();
 
