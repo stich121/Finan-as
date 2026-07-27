@@ -48,7 +48,7 @@ $navItems = [
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
-$assetVersion = '20260725.12';
+$assetVersion = '20260727.13';
 $versionedModules = [
     '/assets/js/api.js',
     '/assets/js/state.js',
@@ -112,7 +112,7 @@ if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $in
   </script>
   <?php endif; ?>
 </head>
-<body>
+<body class="<?= $currentUser ? 'is-authenticated' : 'is-guest' ?>">
   <div id="app">
     <?php if ($currentUser): ?>
     <nav class="bottom-nav">
