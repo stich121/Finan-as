@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'financas-v19';
+const CACHE_VERSION = 'financas-v20';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Só pré-cacheamos assets estáticos (CSS/JS/ícones). As páginas .php são renderizadas
