@@ -52,31 +52,33 @@ function escapeHtml(str) {
 
 function buildFilters() {
   const wrap = el(`
-    <div class="filters">
-      <select id="f-account"><option value="">Todas as contas</option>${accounts.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select>
-      <select id="f-category"><option value="">Todas as categorias</option>${categoryOptionsHtml(categories)}</select>
-      <select id="f-type">
-        <option value="">Todos os tipos</option>
-        <option value="INCOME">Receita</option>
-        <option value="EXPENSE">Despesa</option>
-        <option value="TRANSFER">Transferência</option>
-      </select>
-      <select id="f-status">
-        <option value="">Todas as situações</option>
-        <option value="CLEARED">Confirmadas</option>
-        <option value="PENDING">Pendentes</option>
-      </select>
-      <input id="f-search" type="search" placeholder="Buscar…" />
-      <label class="chip"><input type="checkbox" id="f-uncategorized" style="margin-right:4px;" />Sem categoria</label>
-      <button class="btn small secondary" id="advanced-filter-btn" type="button">Filtros avançados</button>
-    </div>
-    <div class="advanced-filters" id="advanced-filters" hidden>
-      <div class="field"><label>De</label><input id="f-date-from" type="date"></div>
-      <div class="field"><label>Até</label><input id="f-date-to" type="date"></div>
-      <div class="field"><label>Valor mínimo</label><input id="f-min-amount" type="number" min="0" step="0.01"></div>
-      <div class="field"><label>Valor máximo</label><input id="f-max-amount" type="number" min="0" step="0.01"></div>
-      <div class="field"><label>Tag</label><select id="f-tag"><option value="">Todas</option>${tags.map((tag) => `<option value="${tag.id}">${escapeHtml(tag.name)}</option>`).join('')}</select></div>
-      <button class="btn small ghost" id="clear-advanced" type="button">Limpar</button>
+    <div class="transaction-filter-area">
+      <div class="filters">
+        <select id="f-account"><option value="">Todas as contas</option>${accounts.map((a) => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select>
+        <select id="f-category"><option value="">Todas as categorias</option>${categoryOptionsHtml(categories)}</select>
+        <select id="f-type">
+          <option value="">Todos os tipos</option>
+          <option value="INCOME">Receita</option>
+          <option value="EXPENSE">Despesa</option>
+          <option value="TRANSFER">Transferência</option>
+        </select>
+        <select id="f-status">
+          <option value="">Todas as situações</option>
+          <option value="CLEARED">Confirmadas</option>
+          <option value="PENDING">Pendentes</option>
+        </select>
+        <input id="f-search" type="search" placeholder="Buscar…" />
+        <label class="chip"><input type="checkbox" id="f-uncategorized" style="margin-right:4px;" />Sem categoria</label>
+        <button class="btn small secondary" id="advanced-filter-btn" type="button">Filtros avançados</button>
+      </div>
+      <div class="advanced-filters" id="advanced-filters" hidden>
+        <div class="field"><label>De</label><input id="f-date-from" type="date"></div>
+        <div class="field"><label>Até</label><input id="f-date-to" type="date"></div>
+        <div class="field"><label>Valor mínimo</label><input id="f-min-amount" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Valor máximo</label><input id="f-max-amount" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Tag</label><select id="f-tag"><option value="">Todas</option>${tags.map((tag) => `<option value="${tag.id}">${escapeHtml(tag.name)}</option>`).join('')}</select></div>
+        <button class="btn small ghost" id="clear-advanced" type="button">Limpar</button>
+      </div>
     </div>
   `);
   container.appendChild(wrap);
