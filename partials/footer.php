@@ -32,6 +32,10 @@ declare(strict_types=1);
     render(document.getElementById('view'), <?= json_encode($entryScriptArgs ?? [], JSON_UNESCAPED_UNICODE) ?>);
   </script>
   <?php endif; ?>
+  <script type="module">
+    const { initMotion } = await import('/assets/js/motion.js?v=<?= h($assetVersion) ?>');
+    initMotion();
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       const swReloadKey = 'financas-sw-reloaded-<?= h($assetVersion) ?>';
