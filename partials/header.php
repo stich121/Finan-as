@@ -49,13 +49,14 @@ $navItems = [
     ['key' => 'planning', 'href' => '/planning.php', 'icon' => 'target', 'label' => 'Planejar'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
-$assetVersion = '20260727.16';
+$assetVersion = '20260727.17';
 $versionedModules = [
     '/assets/js/api.js',
     '/assets/js/state.js',
     '/assets/js/utils.js',
     '/assets/js/charts.js',
     '/assets/js/icons.js',
+    '/assets/js/motion.js',
     '/assets/js/components/modal.js',
     '/assets/js/components/confirm-dialog.js',
     '/assets/js/components/toast.js',
