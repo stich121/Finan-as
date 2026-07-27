@@ -101,6 +101,40 @@ export function drawCategoryBars(canvas, items) {
   });
 }
 
+export function drawCategoryPie(canvas, items) {
+  const { ctx, width, height } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, width, height);
+
+  const validItems = items.filter((item) => Number(item.amount) > 0);
+  const total = validItems.reduce((sum, item) => sum + Number(item.amount), 0);
+  if (total <= 0) return;
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.max(48, Math.min(width, height) * 0.38);
+  let startAngle = -Math.PI / 2;
+
+  validItems.forEach((item) => {
+    const sliceAngle = (Number(item.amount) / total) * Math.PI * 2;
+    const endAngle = startAngle + sliceAngle;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = item.color || '#38bdf8';
+    ctx.fill();
+
+    if (sliceAngle > 0.035) {
+      ctx.strokeStyle = 'rgba(8, 16, 31, 0.68)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    startAngle = endAngle;
+  });
+}
+
 const activeAnimations = new WeakMap();
 
 export function drawForecastChart(canvas, points) {

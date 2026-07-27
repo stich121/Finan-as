@@ -1,10 +1,11 @@
 import { api } from '../api.js';
 import { getState, setState } from '../state.js';
 import { formatCurrency, formatMonthLabel, addMonths, el } from '../utils.js';
-import { drawTrendChart, drawCategoryBars, drawForecastChart } from '../charts.js';
+import { drawTrendChart, drawCategoryBars, drawCategoryPie, drawForecastChart } from '../charts.js';
 
 let container;
 let resizeHandler;
+const CATEGORY_CHART_KEY = 'finance-category-chart-view';
 
 function escapeHtml(value) {
   const div = document.createElement('div');
@@ -105,12 +106,29 @@ async function load() {
     container.appendChild(alerts);
   }
 
-  container.appendChild(el(`
-    <div class="section-title"><h2>Gasto por categoria</h2></div>
-  `));
-  const catCard = el(`<div class="card"><canvas class="chart" id="category-chart" style="height:${Math.max(120, summary.spendingByCategory.length * 30)}px"></canvas></div>`);
+  const savedCategoryChart = localStorage.getItem(CATEGORY_CHART_KEY);
+  let categoryChartView = savedCategoryChart === 'pie' ? 'pie' : 'bar';
+  const hasCategorySpending = summary.spendingByCategory.length > 0;
+  const categorySectionTitle = el(`
+    <div class="section-title category-chart-heading">
+      <h2>Gastos por categoria</h2>
+      ${hasCategorySpending ? `
+        <div class="chart-view-toggle" role="group" aria-label="Tipo do gráfico de gastos por categoria">
+          <button type="button" data-chart-view="bar" aria-pressed="${categoryChartView === 'bar'}">Colunas</button>
+          <button type="button" data-chart-view="pie" aria-pressed="${categoryChartView === 'pie'}">Pizza</button>
+        </div>
+      ` : ''}
+    </div>
+  `);
+  container.appendChild(categorySectionTitle);
+  const catCard = el(`
+    <div class="card category-chart-card">
+      <canvas class="chart" id="category-chart"></canvas>
+      <div class="category-chart-legend" id="category-chart-legend" aria-label="Legenda do gráfico"></div>
+    </div>
+  `);
   container.appendChild(catCard);
-  if (summary.spendingByCategory.length === 0) {
+  if (!hasCategorySpending) {
     catCard.innerHTML = '<div class="empty-state">Nenhum gasto categorizado neste mês.</div>';
   }
 
@@ -144,14 +162,58 @@ async function load() {
     </div>
   `));
 
-  function paintCharts() {
+  const categoryItems = [...summary.spendingByCategory]
+    .sort((a, b) => b.amount - a.amount)
+    .map((c) => ({ categoryName: c.categoryName, color: c.color, amount: Number(c.amount) }));
+
+  function paintCategoryChart() {
     const catCanvas = document.getElementById('category-chart');
-    if (catCanvas && summary.spendingByCategory.length > 0) {
-      drawCategoryBars(
-        catCanvas,
-        [...summary.spendingByCategory].sort((a, b) => b.amount - a.amount).map((c) => ({ categoryName: c.categoryName, color: c.color, amount: c.amount }))
-      );
+    if (!catCanvas || categoryItems.length === 0) return;
+
+    const legend = document.getElementById('category-chart-legend');
+    const isPie = categoryChartView === 'pie';
+    catCanvas.style.height = isPie ? '280px' : `${Math.max(120, categoryItems.length * 30)}px`;
+    catCanvas.setAttribute('aria-label', isPie ? 'Gráfico de pizza dos gastos por categoria' : 'Gráfico de colunas dos gastos por categoria');
+
+    if (legend) {
+      legend.hidden = !isPie;
+      if (isPie) {
+        const total = categoryItems.reduce((sum, item) => sum + item.amount, 0);
+        legend.innerHTML = categoryItems.map((item) => `
+          <div class="category-legend-item">
+            <span class="dot" style="background:${item.color || '#38bdf8'}"></span>
+            <span class="category-legend-name">${escapeHtml(item.categoryName)}</span>
+            <strong>${total > 0 ? Math.round((item.amount / total) * 100) : 0}%</strong>
+            <small>${formatCurrency(item.amount)}</small>
+          </div>
+        `).join('');
+      }
     }
+
+    if (isPie) drawCategoryPie(catCanvas, categoryItems);
+    else drawCategoryBars(catCanvas, categoryItems);
+  }
+
+  function updateCategoryToggle() {
+    categorySectionTitle.querySelectorAll('[data-chart-view]').forEach((button) => {
+      const active = button.dataset.chartView === categoryChartView;
+      button.setAttribute('aria-pressed', String(active));
+      button.classList.toggle('active', active);
+    });
+  }
+
+  categorySectionTitle.querySelectorAll('[data-chart-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+      categoryChartView = button.dataset.chartView === 'pie' ? 'pie' : 'bar';
+      localStorage.setItem(CATEGORY_CHART_KEY, categoryChartView);
+      updateCategoryToggle();
+      paintCategoryChart();
+    });
+  });
+  updateCategoryToggle();
+
+  function paintCharts() {
+    paintCategoryChart();
     const trendCanvas = document.getElementById('trend-chart');
     if (trendCanvas) drawTrendChart(trendCanvas, trend);
     const forecastCanvas = document.getElementById('forecast-chart');
@@ -159,6 +221,7 @@ async function load() {
   }
 
   paintCharts();
+  if (resizeHandler) window.removeEventListener('resize', resizeHandler);
   resizeHandler = () => paintCharts();
   window.addEventListener('resize', resizeHandler);
 }
