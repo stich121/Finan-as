@@ -69,7 +69,7 @@ async function load() {
   }
 
   const stats = el(`
-    <div>
+    <div data-widget="summary">
       <div class="finance-hero">
         <div class="hero-balance"><span>Patrimônio líquido</span><strong>${formatCurrency(summary.netWorth)}</strong><small>Saldo ${formatCurrency(summary.availableBalance)} · Cartões ${formatCurrency(summary.creditCardDebt)}</small></div>
         <a href="/reports.php" class="btn small secondary">Ver relatório</a>
@@ -86,7 +86,7 @@ async function load() {
 
   if (summary.alerts.length > 0 || summary.uncategorizedCount > 0) {
     container.appendChild(el('<div class="section-title"><h2>Para cuidar agora</h2></div>'));
-    const alerts = el('<div class="alerts-list"></div>');
+    const alerts = el('<div class="alerts-list" data-widget="alerts"></div>');
     summary.alerts.forEach((alert) => {
       alerts.appendChild(el(`
         <a href="${alert.href}" class="alert-card ${alert.kind}">
@@ -110,7 +110,7 @@ async function load() {
   let categoryChartView = savedCategoryChart === 'pie' ? 'pie' : 'bar';
   const hasCategorySpending = summary.spendingByCategory.length > 0;
   const categorySectionTitle = el(`
-    <div class="section-title category-chart-heading">
+    <div class="section-title category-chart-heading" data-widget="categories">
       <h2>Gastos por categoria</h2>
       ${hasCategorySpending ? `
         <div class="chart-view-toggle" role="group" aria-label="Tipo do gráfico de gastos por categoria">
@@ -122,7 +122,7 @@ async function load() {
   `);
   container.appendChild(categorySectionTitle);
   const catCard = el(`
-    <div class="card category-chart-card">
+    <div class="card category-chart-card" data-widget="categories">
       <canvas class="chart" id="category-chart"></canvas>
       <div class="category-chart-legend" id="category-chart-legend" aria-label="Legenda do gráfico"></div>
     </div>
@@ -132,9 +132,9 @@ async function load() {
     catCard.innerHTML = '<div class="empty-state">Nenhum gasto categorizado neste mês.</div>';
   }
 
-  container.appendChild(el(`<div class="section-title"><h2>Tendência (6 meses)</h2></div>`));
+  container.appendChild(el(`<div class="section-title" data-widget="trend"><h2>Tendência (6 meses)</h2></div>`));
   const trendCard = el(`
-    <div class="card">
+    <div class="card" data-widget="trend">
       <canvas class="chart" id="trend-chart"></canvas>
       <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--text-muted);">
         <span><span class="dot" style="background:#22c55e"></span> Receitas</span>
@@ -144,9 +144,9 @@ async function load() {
   `);
   container.appendChild(trendCard);
 
-  container.appendChild(el(`<div class="section-title"><h2>Previsão dos próximos meses</h2><a href="/recurring.php">Ajustar recorrências</a></div>`));
+  container.appendChild(el(`<div class="section-title" data-widget="forecast"><h2>Previsão dos próximos meses</h2><a href="/recurring.php">Ajustar recorrências</a></div>`));
   const forecastCard = el(`
-    <div class="card">
+    <div class="card" data-widget="forecast">
       <canvas class="chart" id="forecast-chart"></canvas>
       <p class="hint">Projeção baseada em parcelas futuras, lançamentos agendados e recorrências cadastradas.</p>
     </div>
@@ -154,13 +154,18 @@ async function load() {
   container.appendChild(forecastCard);
 
   container.appendChild(el(`
-    <div class="quick-actions">
+    <div class="quick-actions" data-widget="quick">
       <a href="/cards.php"><strong>Cartões</strong><span>Faturas, limites e parcelas</span></a>
       <a href="/budgets.php"><strong>Orçamentos</strong><span>Acompanhe seus limites</span></a>
       <a href="/goals.php"><strong>Metas</strong><span>Planeje suas conquistas</span></a>
       <a href="/transactions-import.php"><strong>Importar OFX</strong><span>Atualize seu extrato</span></a>
     </div>
   `));
+
+  const hiddenWidgets = new Set(JSON.parse(localStorage.getItem('finance-hidden-widgets') || '[]'));
+  container.querySelectorAll('[data-widget]').forEach((element) => {
+    element.hidden = hiddenWidgets.has(element.dataset.widget);
+  });
 
   const categoryItems = [...summary.spendingByCategory]
     .sort((a, b) => b.amount - a.amount)

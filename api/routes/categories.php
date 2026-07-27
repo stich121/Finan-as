@@ -7,6 +7,9 @@ const CATEGORY_KINDS = ['INCOME', 'EXPENSE'];
 function handle_route(array $segments, string $method): void
 {
     $userId = require_login();
+    if (!db_column_exists(db(), 'categories', 'is_essential')) {
+        db()->exec('ALTER TABLE categories ADD COLUMN is_essential TINYINT(1) NOT NULL DEFAULT 0 AFTER icon');
+    }
 
     if (empty($segments)) {
         if ($method === 'GET') {
@@ -52,6 +55,7 @@ function category_out(array $c): array
         'parentId' => $c['parent_id'],
         'color' => $c['color'],
         'icon' => $c['icon'],
+        'isEssential' => (bool) ($c['is_essential'] ?? false),
     ];
 }
 
@@ -78,8 +82,8 @@ function categories_create(string $userId): void
 
     $id = uuid_v4();
     db()->prepare(
-        'INSERT INTO categories (id, user_id, name, kind, parent_id, color, icon, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO categories (id, user_id, name, kind, parent_id, color, icon, is_essential, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )->execute([
         $id,
         $userId,
@@ -88,6 +92,7 @@ function categories_create(string $userId): void
         $parentId,
         $data['color'] ?? null,
         $data['icon'] ?? null,
+        !empty($data['isEssential']) ? 1 : 0,
         now_datetime(),
         now_datetime(),
     ]);
@@ -113,17 +118,19 @@ function categories_update(string $userId, string $id): void
         'kind' => $data['kind'] ?? $category['kind'],
         'color' => array_key_exists('color', $data) ? $data['color'] : $category['color'],
         'icon' => array_key_exists('icon', $data) ? $data['icon'] : $category['icon'],
+        'is_essential' => array_key_exists('isEssential', $data) ? (int) (bool) $data['isEssential'] : (int) ($category['is_essential'] ?? 0),
     ];
     require_enum('kind', $fields['kind'], CATEGORY_KINDS);
 
     db()->prepare(
-        'UPDATE categories SET name = ?, kind = ?, parent_id = ?, color = ?, icon = ?, updated_at = ? WHERE id = ? AND user_id = ?'
+        'UPDATE categories SET name = ?, kind = ?, parent_id = ?, color = ?, icon = ?, is_essential = ?, updated_at = ? WHERE id = ? AND user_id = ?'
     )->execute([
         trim((string) $fields['name']),
         $fields['kind'],
         $parentId,
         $fields['color'],
         $fields['icon'],
+        $fields['is_essential'],
         now_datetime(),
         $id,
         $userId,

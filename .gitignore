@@ -3,3 +3,5 @@ api/config.php
 *.log
 .DS_Store
 Thumbs.db
+api/storage/receipts/*
+!api/storage/receipts/.gitkeep

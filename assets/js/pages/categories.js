@@ -77,7 +77,7 @@ function categoryRow(cat, depth, isParent) {
   const row = el(`
     <div class="list-item" style="padding-left:${depth * 18 + 8}px">
       <div class="meta">
-        <div class="title"><span class="dot" style="background:${cat.color || '#64748b'}"></span> ${escapeHtml(cat.name)}</div>
+        <div class="title"><span class="dot" style="background:${cat.color || '#64748b'}"></span> ${escapeHtml(cat.name)} ${cat.isEssential ? '<span class="chip">Essencial</span>' : ''}</div>
       </div>
       <div style="display:flex;gap:4px;">
         ${isParent ? `<button class="btn ghost" data-action="add-sub" title="Nova subcategoria">${icon('plus', { size: 16 })}</button>` : ''}
@@ -132,6 +132,10 @@ function openCategoryForm(category, presetParent = null) {
         <label for="cat-color">Cor</label>
         <input id="cat-color" name="color" type="color" value="${category?.color || '#38bdf8'}" />
       </div>
+      <label class="privacy-toggle" style="margin-bottom:16px;">
+        <input name="isEssential" type="checkbox" ${category?.isEssential ? 'checked' : ''} />
+        <span><strong>Gasto essencial</strong><small>Moradia, alimentação, saúde e outras necessidades.</small></span>
+      </label>
       <div class="field-error" id="cat-form-error" hidden></div>
       <div class="btn-row">
         <button type="submit" class="btn">${isEdit ? 'Salvar' : 'Criar categoria'}</button>
@@ -153,6 +157,7 @@ function openCategoryForm(category, presetParent = null) {
       kind: data.get('kind'),
       parentId: data.get('parentId') || null,
       color: data.get('color'),
+      isEssential: data.get('isEssential') === 'on',
     };
     try {
       if (isEdit) {
