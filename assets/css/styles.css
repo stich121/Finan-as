@@ -1258,8 +1258,12 @@ html[data-resolved-theme="light"] body::after {
   filter: brightness(1.025);
 }
 
-.btn, .fab, .tabs button, .planning-tabs button, .bottom-nav a, .quick-actions > a {
+.btn, .tabs button, .planning-tabs button, .bottom-nav a, .quick-actions > a {
   position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.fab {
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
 }
