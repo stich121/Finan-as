@@ -48,7 +48,7 @@ $navItems = [
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
-$assetVersion = '20260727.13';
+$assetVersion = '20260727.14';
 $versionedModules = [
     '/assets/js/api.js',
     '/assets/js/state.js',
