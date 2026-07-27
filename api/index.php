@@ -54,6 +54,7 @@ $routes = [
     'goals' => 'goals.php',
     'cards' => 'cards.php',
     'reports' => 'reports.php',
+    'productivity' => 'productivity.php',
 ];
 
 if ($resource === '' || !isset($routes[$resource])) {

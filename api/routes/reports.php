@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../lib/productivity.php';
+
 function handle_route(array $segments, string $method): void
 {
     $userId = require_login();
@@ -154,6 +156,7 @@ function reports_csv_safe(?string $value): string
 function reports_backup_json(string $userId): void
 {
     $pdo = db();
+    productivity_ensure_schema($pdo);
     $profileStmt = $pdo->prepare('SELECT id, name, email, currency, theme, created_at, updated_at FROM users WHERE id = ?');
     $profileStmt->execute([$userId]);
 
@@ -167,6 +170,16 @@ function reports_backup_json(string $userId): void
         'recurring_transactions',
         'goals',
         'credit_card_invoices',
+        'account_reconciliations',
+        'debts',
+        'shared_expenses',
+        'shared_wallets',
+        'shared_wallet_entries',
+        'monthly_closings',
+        'financial_snapshots',
+        'activity_log',
+        'transaction_splits',
+        'transaction_attachments',
     ];
     $backup = [
         'format' => 'financas-backup',

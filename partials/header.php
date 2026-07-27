@@ -46,9 +46,10 @@ $navItems = [
     ['key' => 'transactions', 'href' => '/transactions.php', 'icon' => 'card', 'label' => 'Transações'],
     ['key' => 'accounts', 'href' => '/accounts.php', 'icon' => 'bank', 'label' => 'Contas'],
     ['key' => 'cards', 'href' => '/cards.php', 'icon' => 'card', 'label' => 'Cartões'],
+    ['key' => 'planning', 'href' => '/planning.php', 'icon' => 'target', 'label' => 'Planejar'],
     ['key' => 'settings', 'href' => '/settings.php', 'icon' => 'settings', 'label' => 'Mais'],
 ];
-$assetVersion = '20260727.14';
+$assetVersion = '20260727.15';
 $versionedModules = [
     '/assets/js/api.js',
     '/assets/js/state.js',
@@ -91,6 +92,7 @@ if ($currentUser && preg_match('/^./u', trim((string) $currentUser['name']), $in
         ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
         : pref;
       document.documentElement.dataset.resolvedTheme = resolved;
+      document.documentElement.classList.toggle('privacy-mode', localStorage.getItem('finance-privacy-mode') === 'enabled');
     })();
   </script>
   <script type="importmap"><?= json_encode(

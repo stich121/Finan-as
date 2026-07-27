@@ -32,6 +32,8 @@ export async function render(root) {
       <a href="/rules.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Regras de categorização</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
       <a href="/recurring.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Recorrências</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
       <a href="/goals.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Metas financeiras</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/planning.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Planejamento e inteligência</div><div class="subtitle">Calendário, dívidas, assinaturas, compartilhamento e análises</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
+      <a href="/tax-report.php" class="list-item" style="cursor:pointer;"><div class="meta"><div class="title">Relatório anual</div><div class="subtitle">Consolidação auxiliar para Imposto de Renda</div></div>${icon('chevronRight', { size: 16, className: 'inline-icon' })}</a>
     </div>
   `);
   container.appendChild(linksCard);
@@ -88,9 +90,59 @@ export async function render(root) {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       localStorage.setItem('finance-notifications', 'enabled');
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.periodicSync) {
+          try {
+            await registration.periodicSync.register('finance-reminders', { minInterval: 12 * 60 * 60 * 1000 });
+          } catch {
+            /* Alguns navegadores exigem uso frequente do PWA para liberar a tarefa. */
+          }
+        }
+      }
       event.target.textContent = 'Desativar alertas';
       toastSuccess('Alertas ativados neste dispositivo.');
     }
+  });
+
+  const privacyEnabled = localStorage.getItem('finance-privacy-mode') === 'enabled';
+  const privacyCard = el(`
+    <div class="card">
+      <h2>Privacidade e widgets</h2>
+      <label class="privacy-toggle">
+        <input id="privacy-mode" type="checkbox" ${privacyEnabled ? 'checked' : ''}>
+        <span><strong>Ocultar valores financeiros</strong><small>Desfoca saldos e valores para usar o app em locais públicos.</small></span>
+      </label>
+      <p class="hint" style="margin-top:16px;">Escolha os blocos exibidos no início:</p>
+      <div class="widget-settings">
+        ${[
+          ['summary', 'Resumo e patrimônio'],
+          ['alerts', 'Alertas'],
+          ['categories', 'Gastos por categoria'],
+          ['trend', 'Tendência'],
+          ['forecast', 'Previsão'],
+          ['quick', 'Atalhos'],
+        ].map(([key, label]) => `<label><input type="checkbox" data-widget-setting="${key}"> ${label}</label>`).join('')}
+      </div>
+    </div>
+  `);
+  container.appendChild(privacyCard);
+  privacyCard.querySelector('#privacy-mode').addEventListener('change', (event) => {
+    if (event.target.checked) localStorage.setItem('finance-privacy-mode', 'enabled');
+    else localStorage.removeItem('finance-privacy-mode');
+    document.documentElement.classList.toggle('privacy-mode', event.target.checked);
+    toastSuccess(event.target.checked ? 'Valores ocultos.' : 'Valores visíveis.');
+  });
+  const hiddenWidgets = new Set(JSON.parse(localStorage.getItem('finance-hidden-widgets') || '[]'));
+  privacyCard.querySelectorAll('[data-widget-setting]').forEach((input) => {
+    input.checked = !hiddenWidgets.has(input.dataset.widgetSetting);
+    input.addEventListener('change', () => {
+      const updated = new Set(JSON.parse(localStorage.getItem('finance-hidden-widgets') || '[]'));
+      if (input.checked) updated.delete(input.dataset.widgetSetting);
+      else updated.add(input.dataset.widgetSetting);
+      localStorage.setItem('finance-hidden-widgets', JSON.stringify([...updated]));
+      toastSuccess('Widgets atualizados.');
+    });
   });
 
   const passwordCard = el(`

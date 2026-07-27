@@ -58,6 +58,16 @@ sql/migration_2026_07_finance_complete.sql
 Essa migração preserva usuários, contas e transações existentes e adiciona os campos de limite,
 fechamento, vencimento, faturas, parcelas e situação de conciliação.
 
+Para instalar o centro de planejamento, análises e compartilhamento em uma instalação antiga,
+execute também:
+
+```
+sql/migration_2026_07_productivity_suite.sql
+```
+
+O aplicativo também tenta criar essas estruturas automaticamente no primeiro acesso à página
+Planejamento, desde que o usuário MySQL possua permissão para criar e alterar tabelas.
+
 ## Recursos principais
 
 - Contas correntes, poupança, dinheiro, investimentos e cartões de crédito
@@ -69,6 +79,12 @@ fechamento, vencimento, faturas, parcelas e situação de conciliação.
 - Orçamento mensal, recorrências e metas financeiras
 - Dashboard com patrimônio líquido, dívidas, alertas e previsão de seis meses
 - Relatórios por período, categorias e beneficiários, com exportação CSV e backup JSON
+- Calendário financeiro, conciliação de saldos e fechamento mensal
+- Detector de assinaturas, planejamento de dívidas e projeções para 30, 60 e 90 dias
+- Divisão de compras por categoria, despesas com pessoas e carteiras compartilhadas
+- Evolução patrimonial, mapa de calor, gastos essenciais e relatório anual
+- Comprovantes com OCR no navegador, assistente financeiro e modo privacidade
+- Widgets configuráveis e notificações PWA com sincronização periódica quando suportada
 - Tema claro, escuro ou automático e instalação como PWA
 
 Não há build step: qualquer alteração nos arquivos é refletida direto no navegador (dê F5).

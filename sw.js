@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'financas-v14';
+const CACHE_VERSION = 'financas-v15';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // Só pré-cacheamos assets estáticos (CSS/JS/ícones). As páginas .php são renderizadas
@@ -61,6 +61,60 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(cacheFirst(request));
+});
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(self.registration.showNotification(payload.title || 'Finanças', {
+    body: payload.body || 'Você tem uma atualização financeira.',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: payload.tag || 'finance-reminder',
+    data: { url: payload.url || '/planning.php' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/planning.php';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((client) => 'focus' in client);
+      if (existing) {
+        existing.navigate(targetUrl);
+        return existing.focus();
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag !== 'finance-reminders') return;
+  event.waitUntil(
+    fetch('/api/productivity/overview', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((overview) => {
+        if (!overview?.calendar?.length) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const limit = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+        const next = overview.calendar.find((item) => item.date >= today && item.date <= limit);
+        if (!next) return;
+        return self.registration.showNotification('Compromisso financeiro próximo', {
+          body: `${next.title} vence em ${next.date.split('-').reverse().join('/')}.`,
+          icon: '/icons/icon-192.png',
+          badge: '/icons/icon-192.png',
+          tag: `finance-${next.id}-${next.date}`,
+          data: { url: '/planning.php' },
+        });
+      })
+      .catch(() => {})
+  );
 });
 
 async function apiNetworkOnly(request) {

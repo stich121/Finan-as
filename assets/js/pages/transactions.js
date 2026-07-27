@@ -9,7 +9,8 @@ import { icon } from '../icons.js';
 let container;
 let accounts = [];
 let categories = [];
-let filters = { accountId: '', categoryId: '', type: '', status: '', uncategorizedOnly: false, search: '' };
+let tags = [];
+let filters = { accountId: '', categoryId: '', type: '', status: '', uncategorizedOnly: false, search: '', dateFrom: '', dateTo: '', minAmount: '', maxAmount: '', tagId: '' };
 let page = 1;
 const pageSize = 30;
 let selectedIds = new Set();
@@ -19,7 +20,7 @@ export async function render(root) {
   container = root;
   container.innerHTML = '<div class="spinner">Carregando…</div>';
 
-  [accounts, categories] = await Promise.all([api.get('/accounts?includeArchived=1'), api.get('/categories')]);
+  [accounts, categories, tags] = await Promise.all([api.get('/accounts?includeArchived=1'), api.get('/categories'), api.get('/tags')]);
 
   container.innerHTML = '';
   buildHeader();
@@ -67,6 +68,15 @@ function buildFilters() {
       </select>
       <input id="f-search" type="search" placeholder="Buscar…" />
       <label class="chip"><input type="checkbox" id="f-uncategorized" style="margin-right:4px;" />Sem categoria</label>
+      <button class="btn small secondary" id="advanced-filter-btn" type="button">Filtros avançados</button>
+    </div>
+    <div class="advanced-filters" id="advanced-filters" hidden>
+      <div class="field"><label>De</label><input id="f-date-from" type="date"></div>
+      <div class="field"><label>Até</label><input id="f-date-to" type="date"></div>
+      <div class="field"><label>Valor mínimo</label><input id="f-min-amount" type="number" min="0" step="0.01"></div>
+      <div class="field"><label>Valor máximo</label><input id="f-max-amount" type="number" min="0" step="0.01"></div>
+      <div class="field"><label>Tag</label><select id="f-tag"><option value="">Todas</option>${tags.map((tag) => `<option value="${tag.id}">${escapeHtml(tag.name)}</option>`).join('')}</select></div>
+      <button class="btn small ghost" id="clear-advanced" type="button">Limpar</button>
     </div>
   `);
   container.appendChild(wrap);
@@ -77,6 +87,26 @@ function buildFilters() {
   wrap.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; page = 1; loadList(); });
   wrap.querySelector('#f-uncategorized').addEventListener('change', (e) => { filters.uncategorizedOnly = e.target.checked; page = 1; loadList(); });
   wrap.querySelector('#f-search').addEventListener('input', debounce((e) => { filters.search = e.target.value; page = 1; loadList(); }, 350));
+  wrap.querySelector('#advanced-filter-btn').addEventListener('click', () => {
+    const panel = wrap.querySelector('#advanced-filters');
+    panel.hidden = !panel.hidden;
+  });
+  const bindAdvanced = (selector, key) => wrap.querySelector(selector).addEventListener('change', (event) => {
+    filters[key] = event.target.value;
+    page = 1;
+    loadList();
+  });
+  bindAdvanced('#f-date-from', 'dateFrom');
+  bindAdvanced('#f-date-to', 'dateTo');
+  bindAdvanced('#f-min-amount', 'minAmount');
+  bindAdvanced('#f-max-amount', 'maxAmount');
+  bindAdvanced('#f-tag', 'tagId');
+  wrap.querySelector('#clear-advanced').addEventListener('click', () => {
+    ['dateFrom', 'dateTo', 'minAmount', 'maxAmount', 'tagId'].forEach((key) => { filters[key] = ''; });
+    wrap.querySelectorAll('#advanced-filters input, #advanced-filters select').forEach((field) => { field.value = ''; });
+    page = 1;
+    loadList();
+  });
 }
 
 async function loadList() {
@@ -90,6 +120,11 @@ async function loadList() {
   if (filters.status) params.set('status', filters.status);
   if (filters.uncategorizedOnly) params.set('uncategorizedOnly', '1');
   if (filters.search) params.set('search', filters.search);
+  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+  if (filters.dateTo) params.set('dateTo', filters.dateTo);
+  if (filters.minAmount) params.set('minAmount', filters.minAmount);
+  if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
+  if (filters.tagId) params.set('tagId', filters.tagId);
   params.set('page', page);
   params.set('pageSize', pageSize);
 

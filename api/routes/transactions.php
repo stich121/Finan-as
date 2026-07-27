@@ -151,6 +151,18 @@ function transactions_list(string $userId): void
         $where[] = 'date <= ?';
         $params[] = $_GET['dateTo'];
     }
+    if (isset($_GET['minAmount']) && $_GET['minAmount'] !== '') {
+        $where[] = 'ABS(amount) >= ?';
+        $params[] = max(0, (float) $_GET['minAmount']);
+    }
+    if (isset($_GET['maxAmount']) && $_GET['maxAmount'] !== '') {
+        $where[] = 'ABS(amount) <= ?';
+        $params[] = max(0, (float) $_GET['maxAmount']);
+    }
+    if (!empty($_GET['tagId'])) {
+        $where[] = 'EXISTS (SELECT 1 FROM transaction_tags filter_tt WHERE filter_tt.transaction_id = transactions.id AND filter_tt.tag_id = ?)';
+        $params[] = $_GET['tagId'];
+    }
     if (!empty($_GET['search'])) {
         $where[] = '(description LIKE ? OR payee LIKE ? OR memo LIKE ?)';
         $term = '%' . $_GET['search'] . '%';
